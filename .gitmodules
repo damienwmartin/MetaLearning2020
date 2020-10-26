@@ -1,3 +1,6 @@
 [submodule "alpha-zero-general.git"]
 	path = alpha-zero-general
 	url = https://github.com/damienwmartin/alpha-zero-general.git
+[submodule "open_spiel"]
+	path = open_spiel
+	url = https://github.com/deepmind/open_spiel.git
