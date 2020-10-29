@@ -10,3 +10,6 @@
 [submodule "Deep-CFR"]
 	path = Deep-CFR
 	url = https://github.com/EricSteinberger/Deep-CFR.git
+[submodule "alpha-zero-general"]
+	path = alpha-zero-general
+	url = https://github.com/suragnair/alpha-zero-general
