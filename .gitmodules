@@ -4,3 +4,9 @@
 [submodule "open_spiel"]
 	path = open_spiel
 	url = https://github.com/deepmind/open_spiel.git
+[submodule "PokerRL"]
+	path = PokerRL
+	url = https://github.com/EricSteinberger/PokerRL.git
+[submodule "Deep-CFR"]
+	path = Deep-CFR
+	url = https://github.com/EricSteinberger/Deep-CFR.git
