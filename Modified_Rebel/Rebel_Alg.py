@@ -11,12 +11,13 @@ update_policy
 sample_leaf (probably want to move this into subgame methods)
 
 Undefined classes
-Subgame (G)
+Subgame (G) - Depth limited tree of game states
  - G.set_leaf_values(policy, p_net)
  - G.compute_ev(policy)
+ - G.sample_leaf(policy)
  
 
-PBS
+PBS - Probability distribution over true game states based on shared public knowledge
 
 '''
 
@@ -63,4 +64,6 @@ def ReBeL(PBS, v_net, p_net, D_v, D_p, T):
 			D_p.append(tuple(node, pi_bar.get_policy(node)))
 
 		PBS = next_PBS
+
+
 
