@@ -44,6 +44,14 @@ def _build_model(device, env_cfg, cfg, state_dict=None, half=False, jit=False):
 
 class CFVExp:
     def __init__(self, cfg, game_name):
+
+        """
+        Initialization of our class for the ReBeL self-playing step
+
+        Parameters:
+        cfg - a configuration file
+        game_name - the game to implement the algorithm on
+        """
  
         self.cfg = cfg
         self.device = cfg.device or "cuda"
@@ -65,7 +73,11 @@ class CFVExp:
         )
  
         self.game = pyspiel.load_game(game_name)
-        self.num_actions = cfg.env.num_dice * cfg.env.num_faces * 2 + 1 # Change this
+        # self.num_actions = cfg.env.num_dice * cfg.env.num_faces * 2 + 1
+
+        # These are options to be specified in the configuration file. The first refers to our first big change, while the second to our second big change
+        self.dynamic_subgame_construction = cfg.dynamic_subgame_construction
+        self.pbs_encoding = cfg.pbs_encoding
  
         self.net = _build_model(self.device, self.cfg.env, self.cfg.model)
         if self.is_master:
@@ -333,6 +345,8 @@ class CFVExp:
         num_decays = 0
         for epoch in range(self.cfg.max_epochs):
             self.train_timer.start("start")
+
+            # Decrease our learning rate every (specified number) of iterations
             if (
                 epoch % self.cfg.decrease_lr_every == self.cfg.decrease_lr_every - 1
                 and self.scheduler is None
@@ -344,6 +358,8 @@ class CFVExp:
                     for param_group in self.opt.param_groups:
                         param_group["lr"] /= 2
                     num_decays += 1
+            
+            # Creation of a validation set
             if (
                 self.cfg.create_validation_set_every
                 and self.is_master
@@ -356,6 +372,8 @@ class CFVExp:
                 ]
                 val_datasets.append((f"valid_snapshot_{epoch:04d}", val_batches))
  
+
+            # Dump Data every (specified number) of epochs
             if (
                 self.cfg.selfplay.dump_dataset_every_epochs
                 and epoch % self.cfg.selfplay.dump_dataset_every_epochs == 0
