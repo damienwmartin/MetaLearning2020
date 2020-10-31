@@ -2,6 +2,24 @@
 
 import numpy
 
+'''
+Undefined functions in here
+constuct_subgame
+init_policy
+compute_ev
+update_policy
+sample_leaf (probably want to move this into subgame methods)
+
+Undefined classes
+Subgame (G)
+ - G.set_leaf_values(policy, p_net)
+ - G.compute_ev(policy)
+ 
+
+PBS
+
+'''
+
 def ReBeL(PBS, v_net, p_net, D_v, D_p, T):
 	while not PBS.is_terminal:
 		#Build game tree going forward n actions from start node
@@ -45,3 +63,4 @@ def ReBeL(PBS, v_net, p_net, D_v, D_p, T):
 			D_p.append(tuple(node, pi_bar.get_policy(node)))
 
 		PBS = next_PBS
+
