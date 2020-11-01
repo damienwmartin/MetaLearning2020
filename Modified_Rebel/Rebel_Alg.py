@@ -12,7 +12,7 @@ sample_leaf (probably want to move this into subgame methods)
 
 Undefined classes
 Subgame (G) - Depth limited tree of game states
- - G.set_leaf_values(policy, p_net)
+ - G.set_leaf_values(policy, v_net)
  - G.compute_ev(policy)
  - G.sample_leaf(policy)
  
