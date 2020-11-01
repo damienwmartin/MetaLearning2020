@@ -8,3 +8,4 @@ Overview
 Still need to do
 - plug in a cfr implementation
 - Game wrapper
+- Training Loop
