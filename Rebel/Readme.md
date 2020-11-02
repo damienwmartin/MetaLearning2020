@@ -7,5 +7,5 @@ Overview
 
 Still need to do
 - plug in a cfr implementation
-- implement game wrapper probably for leduk
+- implement game wrapper for Leduc
 - Training Loop
