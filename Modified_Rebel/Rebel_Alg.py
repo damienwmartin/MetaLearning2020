@@ -4,17 +4,16 @@ import numpy
 
 '''
 Undefined functions in here
-constuct_subgame
-init_policy
-compute_ev
-update_policy
+init_policy -> also probably just subgame method
+update_policy -> CFR iterations, still needs to be implemented
 sample_leaf (probably want to move this into subgame methods)
 
 Undefined classes
 Subgame (G) - Depth limited tree of game states
- - G.set_leaf_values(policy, v_net)
- - G.compute_ev(policy)
- - G.sample_leaf(policy)
+ - G.constuct_subgame todo
+ - G.set_leaf_values(policy, v_net) -> Moved to game_tree method
+ - G.compute_ev(policy) -> Moved to game_tree method
+ - G.sample_leaf(policy) -> game_tree method still need to implement
  
 
 PBS - Probability distribution over true game states based on shared public knowledge
