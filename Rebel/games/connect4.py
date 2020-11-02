@@ -19,6 +19,7 @@ class ConnectFour(game_wrapper):
     (1, board_size*board_size+1), using the representation
     [board_size*board_size unraveled board entries, 1 player whose turn it is]
     '''
+
     def __init__(self, height=6, width=7, win_length=4, num_pieces=42):
         super().__init__()
         #Creates an othello board of size (board_size x board_size)
@@ -33,9 +34,9 @@ class ConnectFour(game_wrapper):
         player = game_state[1]
 		return self.game.getValidMoves(board, player)
 
-	def get_rewards(game_state):
+    def get_rewards(game_state):
         '''
-		Takes a terminal game state and return rewards for each player
+	Takes a terminal game state and return rewards for each player
 
         Right now reward is just set to the score
 
@@ -51,23 +52,25 @@ class ConnectFour(game_wrapper):
         rewards[0,0] = rewards[0,-1]
         return rewards
 
-	def pbs2gamestate(PBS):
+    def pbs2gamestate(PBS):
         '''
-		Converts PBS into a readable game state
+	Converts PBS into a readable game state
         '''
         board = PBS[0,0:-1].reshape((self.board_size, self.board_size))
         player = PBS[0,-1]
 
-	def gamestate2public_state(game_state):
+    def gamestate2public_state(game_state):
         '''
-		Converts gamestate to PBS public state
+	Converts gamestate to PBS public state
         '''
-		board = game_state[0]
+	board = game_state[0]
         player = game_state[1]
         return np.concat(np.ravel(board), np.array([player], axis=0)
 
-	def take_action(game_state, action):
-		#returns next public state
+    def take_action(game_state, action):
+	'''
+	Returns next public state
+	'''
         board = game_state[0]
         player = game_state[1]
         return self.game.getNextState(board, player, action)
