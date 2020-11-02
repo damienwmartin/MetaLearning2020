@@ -2,6 +2,10 @@ import networkx as nx
 '''
 Implentation for the game trees and wrappers for different game libraries
 ReBeL only interacts with the subgame tree so if we place the wrapper here the rest should be application independant
+
+
+Note:
+- Leaf nodes are terminal in the subgame but not in the full game
 '''
 
 class game_tree():
@@ -50,17 +54,25 @@ class game_tree():
 	
 	def set_leaf_values(self, policy, value_net, node=None):
 		#start at root if no node is given
-		if node == None	
+		if node == None:
 			node = self.tree.nodes[(0,0)]
 
-		#
+		#Estimate values for nodes terminal in the subgame
 		if node['subgame_terminal']:
+			node['value'] = value_net(node['PBS'].vector())
 
-
-
+		#Otherwise recursively rebuild the tree
+		
+		elif (i := node['depth']) < self.max_depth:
+			for j, action in enumerate(legal_moves):
+				self.tree.add_node((i+1, j),  {'depth':i+1, state = node['PBS'].transition(action)})
+				self.tree.add_edge(node, (i+1, j), action = action)
+				self.set_leaf_values(policy, value_net, self.tree.nodes[(i,j)]) #TODO the policy being passed here is wrong
+					
 
 
 	def sample_leaf(self, policy)
+		#Probabilistically run through the subgame tree until you hit a leaf node and return is to start new subgame
 		raise(NotImplementedError)
 	
 	def compute_ev(policy):
@@ -68,13 +80,12 @@ class game_tree():
 
 
 class recursive_game_tree():
-	#Much better way to implement this
+	#TODO: Game tree can be implemented way cleaner
 	def __init__ (self, PBS): 
 		self.tree.add_node((0, 0), depth=0, PBS=PBS, )
 
 	def expand_node(node = None):
-		if node == None:
-			pass
+		
 
 	def update_node(node = None):
 		

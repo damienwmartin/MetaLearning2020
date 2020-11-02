@@ -1,29 +1,28 @@
-#Just putting in psuedocode for the rebel overall rebel algorithm
+#psuedocode for the rebel overall rebel algorithm
 
 import numpy
+from game_tree import game_tree
 
 '''
 Undefined functions in here
-init_policy -> also probably just subgame method
-update_policy -> CFR iterations, still needs to be implemented
-sample_leaf (probably want to move this into subgame methods)
+init_policy -> should probably be a just subgame method
+update_policy -> CFR iteration, still needs to be implemented
 
-Undefined classes
 Subgame (G) - Depth limited tree of game states
- - G.constuct_subgame todo
- - G.set_leaf_values(policy, v_net) -> Moved to game_tree method
- - G.compute_ev(policy) -> Moved to game_tree method
- - G.sample_leaf(policy) -> game_tree method still need to implement
- 
+ - G.constuct_subgame -> (pseudocode)
+ - G.set_leaf_values(policy, v_net) -> (pseudocode)
+ - G.compute_ev(policy) -> not implemented
+ - G.sample_leaf(policy) -> not implemented
 
-PBS - Probability distribution over true game states based on shared public knowledge
+ TODO: Move all policies into the subgame tree nodes
 
-'''
+ '''
 
-def ReBeL(PBS, v_net, p_net, D_v, D_p, T):
+def ReBeL(PBS, v_net, p_net, D_v, D_p, T, game_wrapper):
 	while not PBS.is_terminal:
 		#Build game tree going forward n actions from start node
-		G = construct_subgame(PBS)
+		G = game_tree(game_wrapper)
+		G.construct_subgame(PBS)
 
 		#initialize policy using the policy network
 		pi_bar, pi_t = init_policy(G, p_net)
@@ -54,7 +53,7 @@ def ReBeL(PBS, v_net, p_net, D_v, D_p, T):
 
 			#Sample a leaf node for the next iteration
 			if t == t_sample:
-				next_PBS = sample_leaf(G, pi_t) 
+				next_PBS = G.sample_leaf(pi_t) 
 
 		#Add trainging data for value and policy net
 		D_v.append(tuple(PBS, EV_PBS))
