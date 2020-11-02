@@ -67,13 +67,16 @@ class game_tree():
 		raise(NotImplementedError)
 
 
-class game_tree2():
+class recursive_game_tree():
+	#Much better way to implement this
 	def __init__ (self, PBS): 
 		self.tree.add_node((0, 0), depth=0, PBS=PBS, )
 
-	def spawn_nodes(node = None):
+	def expand_node(node = None):
 		if node == None:
-			node = self.tree.
+			pass
 
+	def update_node(node = None):
+		
 
 
