@@ -14,11 +14,6 @@ Methods to implent
  - G.sample_leaf()
 '''
 
-class policy():
-	#dict mapping action -> probability | infostate 
-	pass
-
-
 class PBS():
 	'''
 	Containts all public knowledge of knowledge and probability distribution for each players infostates
@@ -26,7 +21,7 @@ class PBS():
 	'''
 	def __init__(self, public_state, infostate_probs):
 		#representation of public state for the game
-		self.public_state = public_state
+		self.public = public_state
 		#list of probability matrices for each players infostate, (len(#players)*infostate size)
 		self.infostate_probs = infostate_probs 
 
