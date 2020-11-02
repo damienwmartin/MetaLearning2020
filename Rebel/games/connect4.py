@@ -58,6 +58,7 @@ class ConnectFour(game_wrapper):
         '''
         board = PBS[0,0:-1].reshape((self.board_size, self.board_size))
         player = PBS[0,-1]
+	return (board, player)
 
     def gamestate2public_state(game_state):
         '''
