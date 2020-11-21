@@ -1,9 +1,11 @@
 import pyspiel
 import collections
+from .util_h import normalize_probabilities_safe
+
+EPSILON = 1e-20
 
 def normalize_beliefs_inplace(beliefs):
-    pass
-    # Have to figure out what this is
+    return normalize_probabilities_safe(beliefs, EPSILON)
 
 def compute_strategy_recursive(game, tree, node_id, beliefs, solver_builder, strategy):
     """
