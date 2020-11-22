@@ -1,6 +1,7 @@
 import torch
 from .subgame_solving_h import ISubgameSolver
 from .subgame_solving_cc import *
+from .util_h import *
 
 class PartialTreeTraverser:
 
@@ -75,6 +76,11 @@ class BRSolver(PartialTreeTraverser):
         super().__init__(game, tree, value_net)
         self.br_strategies = [[[0 for i in range(game.num_actions())] for j in range(game.num_hands())] for k in range(len(tree))]
 
+        self.num_strategies = 0
+        self.params = params
+        self.root_values = None
+        self.root_values_means = None
+
     def compute_br(traverser, opponent_strategy, initial_beliefs, values):
         self.precompute_reaches(opponent_strategy, initial_beliefs)
         self.precompute_all_leaf_values(traverser)
@@ -121,7 +127,7 @@ class FP(ISubgameSolver):
         self.last_strategies = average_strategies
         self.sum_strategies = get_uniform_reach_weighted_strategy(game, tree, initial_beliefs)
     
-    def update_sum_strat(public_node, traverser, br_strategies, traverser_beliefs):
+    def update_sum_strat(self, public_node, traverser, br_strategies, traverser_beliefs):
 
         node = self.tree[public_node]
         state = node.state
@@ -139,7 +145,7 @@ class FP(ISubgameSolver):
                 for child_node in ChildrenIt(node):
                     self.update_sum_strat(child_node, traverser, br_strategies, traverser_beliefs)
     
-    def step(traverser):
+    def step(self, traverser):
 
         br_strategy = self.br_solver.compute_br(traverser, self.average_strategies, self.initial_beliefs, self.root_values[traverser])
         num_update = self.num_strategies / 2 + 1
@@ -152,3 +158,144 @@ class FP(ISubgameSolver):
 
         for node in range(len(self.tree)):
             if self.tree[node].num_children() and tree[node].state.player_id == traverser:
+                for hand in range(self.game.num_hands()):
+                    if params.linear_update:
+                        for j in range(len(self.sum_strategies[node][i])):
+                            self.sum_strategies[node][i][j] *= (num_update + 1)/(num_update + 2)
+                    """
+                    if params.optimistic:
+                        normalize_probabilities_safe(self.sum_strategies[node][i], self.last_strategies[node][i], self.average_strategies[node][i])
+                    else:
+                        normalize_probabilities_safe(self.sum_strategies[node][i], self.average_strategies[node][i])
+                    """
+        
+        self.num_strategies += 1
+    
+    def multistep(self):
+        for i in range(params.num_iter):
+            self.step(i % 2)
+    
+    def update_value_network(self)
+        br_solver.add_training_example(0, get_hand_values(0))
+        br_solver.add_training_example(1, get_hand_values(1))
+    
+    def get_strategy(self):
+        return self.average_strategies
+    
+    def get_tree(self):
+        return self.tree
+
+
+class CFR(ISubgameSolver, PartialTreeTraverser):
+
+    def __init__(self, game, tree, value_net, beliefs, params):
+        super(PartialTreeTraverser, self).__init__(game, tree, value_net)
+        self.params = params
+        self.initial_beliefs = beliefs
+        self.num_steps = [0, 0]
+        
+        self.average_strategies = get_uniform_strategy(game, tree)
+        self.last_strategies = self.average_strategies
+        self.sum_strategies = get_uniform_reach_weighted_strategy(game, tree, initial_beliefs)
+        self.regrets = [[[0 for i in range(game.num_actions())] for j in range(game.num_hands())] for k in range(len(tree))]
+        self.reach_probabilities_buffer = [[0 for in range(game.num_hands())] for j in range(len(tree))]
+
+        self.root_values = [None, None]
+        self.root_values_means = [None, None]
+    
+    def update_regrets(self, traverser):
+        self.precompute_reaches(self.last_strategies, self.initial_beliefs)
+        self.precompute_all_leaf_values(traverser)
+
+        for public_node_id in range(len(self.tree)):
+            node = self.tree[public_node_id]
+            if node.num_children():
+                state = node.state
+                value = [0 for i in range(len(self.traverser_values[public_node_id]))]
+                if state.player_id == traverser:
+                    for child_node, action in ChildrenActionIt(node, game):
+                        action_value = self.traverser_values[child_node]
+                        for hand in range(self.game.num_hands()):
+                            regrets[public_node_id][hand][action] += action_value[hand]
+                            value[hand] += action_value[hand]*last_strategies[public_node_id][hand][action]
+                    for hand in range(self.game.num_hands()):
+                        for child_node, action in ChildrenActionIt(node, game):
+                            regrets[public_node_id][hand][action] -= value[hand]
+            else:
+                assert state.player_id == 1 - traverser
+                for child_node in ChildrenIt(node):
+                    action_value = traverser_values[child_node]
+                    for hand in range(self.game.num_hands()):
+                        value[hand] += action_value[hand]
+                
+                self.traverser_values[public_node_id] = value
+    
+    def step(self, traverser):
+        self.update_regrets(traverser)
+        self.root_values[traverser] = self.traverser_values[0]
+
+        alpha = 2 /(self.num_steps[traverser] + 2) if self.params.linear_update else 1 / (self.num_steps[traverser] + 1)
+        self.root_values_means[traverser] = resize(self.root_values_means(traverser), len(self.root_values[traverser]))
+        for i in range(len(self.root_values[traverser])):
+            self.root_values_means[traverser][i] += (self.root_values[traverser][i] - self.root_values_means[traverser][i])*alpha
+
+        pos_discount = 1
+        neg_discount = 1
+        strat_discount = 1
+
+        num_strategies = self.num_steps[traverser] + 1
+        if self.params.linear_update:
+            pos_discount = num_strategies / (num_strategies + 1)
+            neg_discount = pos_discount
+            strat_discount = pos_discount
+        elif self.params.dcfr:
+            if self.params.dcfr_alpha < 5:
+                pos_discount = num_strategies**self.params.dcfr_alpha / (num_strategies**self.params.dcfr_alpha + 1)
+            if self.params.dcfr_beta > -5:
+                neg_discount = num_strategies**self.params.dcfr_beta / (num_strategies**self.params.dcfr_beta + 1)
+            strat_discount = (num_strategies / (num_strategies + 1))**self.params.dcfr_gamma
+        
+        for node_id in range(len(self.tree)):
+            if self.tree[node_id].num_children() and self.tree[node_id].state.player_id == traverser:
+                start, end = self.game.get_bid_ranges(self.tree[node_id].state)
+                for hand in range(self.game.num_hands())
+                    for action in range(start, end):
+                        self.last_strategies[node_id][hand][action] = max(regrets[node_id][hand][action], EPSILON)
+                    last_strategies[node][hand] = normalize_probabilities_safe(last_strategies[node][hand])
+        
+        compute_reach_probabilities(self.tree, self.last_strategies, self.initial_beliefs[traverser], traverser, self.reach_probabilities_buffer)
+
+        for node_id in range(len(self.tree)):
+            if self.tree[node_id].num_children() and self.tree[node_id].state.player_id == traverser:
+                action_begin, action_end = self.game.get_bid_ranges(self.tree[node_id].state)
+                for hand in range(self.game.num_hands()):
+                    for action in range(action_begin, action_end):
+                        self.regrets[node_id][hand][action] *= (pos_discount if self.regrets[node][i][a] > 0 else neg_discount)
+                        self.sum_strategies[node_id][hand][action] *= strat_discount
+                        self.sum_strategies[node_id][hand][action] += (self.reach_probabilities_buffer[node_id][hand] * self.last_strategies[node_id][hand][action])
+                        self.average_strategies[node_id][hand] = normalize_probabilities_safe(sum_strategies[node_id][hand])
+        
+        self.num_steps[traverser] += 1
+    
+    def multistep(self, traverser):
+        for i in range(self.params.num_iters):
+            self.step(i % 2)
+    
+    def update_value_network(self):
+        self.add_training_example(0, self.get_hand_values(0))
+        self.add_training_example(1, self.get_hand_values(1))
+    
+    def get_strategy(self):
+        return self.average_strategies
+
+    def get_sampling_strategy(self):
+        return self.last_strategies
+    
+    def get_belief_propagation_strategies(self):
+        return self.last_strategies
+    
+    def print_strategy(self):
+        return "Needs to be implemented :)"
+    
+    def get_hand_values(self, player_id):
+        return self.root_values_means[player_id]

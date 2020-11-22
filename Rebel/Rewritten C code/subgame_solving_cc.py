@@ -35,7 +35,7 @@ def compute_expected_terminal_values(game, last_bid, inverse, op_reach_probabili
     return values
 
 
-def get_ery_size(game):
+def get_query_size(game):
 
     return 1 + 1 + game.num_actions() + game.num_hands()*2
 
@@ -55,3 +55,29 @@ def get_uniform_reach_weighted_strategy(game, tree, initial_beliefs):
                         strategy[node][hand][action] *= reach_probabilities_buffer[node][hand]
     
     return strategy
+
+def compute_win_probability(game, action, beliefs):
+    unpacked_action = game.unpack_action(action)
+    believed_counts = [0 for i in range(game.total_num_dice() + 1)]
+    for hand in range(len(beliefs)):
+        matches = game.num_matches(hand, unpacked_bet[1])
+        believed_counts[matches] += beliefs[hand]
+    
+    for i in range(1, len(believed_counts)):
+        believed_counts[-1-i] += believed_counts[-i]
+    
+    values = []
+    for hand in range(len(beliefs)):
+        matches = game.num_matches(hand, unpacked_action[1])
+        left_to_win = max(0, unpacked_action[0] - matches)
+        prob_to_win = believed_counts[left_to_win]
+        values.append(prob_to_win)
+    
+    return values
+
+def build_solver(game, root, beliefs, params, net):
+
+    if params.use_cfr:
+        return CFR(game, root, net, beliefs, params)
+    else:
+        return FP(game, root, net, beliefs, params)
