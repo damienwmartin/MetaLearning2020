@@ -81,3 +81,66 @@ def build_solver(game, root, beliefs, params, net):
         return CFR(game, root, net, beliefs, params)
     else:
         return FP(game, root, net, beliefs, params)
+
+def compute_exploitability2(game, strategy):
+    root = game.get_initial_state()
+    tree = unroll_tree(game, root, 1000000)
+    beliefs = ([1/game.num_hands() for i in range(game.num_hands())], [1/game.num_hands() for i in range(game.num_hands())])
+    solver = BRSolver(game, tree, None)
+    values0 = solver.compute_br(0, strategy, beliefs)
+    values1 = solver.compute_br(1, strategy, beliefs)
+
+    return (sum(values0)/len(values0), sum(values1)/len(values1))
+
+def compute_exploitability(game, strategy):
+    exploitabilities = compute_exploitability2(game, strategy)
+    return (exploitabilities[0] + exploitabilities[1])/2
+
+def compute_strategy_stats(game, strategy):
+    uniform_beliefs = get_initial_beliefs(game)[0]
+    tree = unroll_tree(game)
+    stats = TreeStrategyStats(tree=tree)
+
+    reach_probabilities = stats.reach_probabilities
+
+    #TODO: Finish this function!
+
+def compute_ev(game, strategy1, strategy2):
+    tree = unroll_tree(game)
+    op_reach_probabilities = [[0 for i in range(game.num_hands())] for j in range(len(tree))]
+    values = [[] for i in range(len(tree))]
+    player = 0
+    compute_reach_probabilities(tree, strategy2, get_initial_beliefs(game)[0], 1 - player, op_reach_probabilities)
+
+    for node_id in range(len(tree)):
+        node = tree[node_id]
+        state = node.state
+        if not node.num_children():
+            assert game.is_terminal(state)
+            last_bid = tree[node.parent].state.last_bid
+            values[node_id] = compute_expected_terminal_values(game, last_bid, state.player_id != player, op_reach_probabilities[node_id])
+        elif state.player_id == player:
+            values[node_id] = resize(values[node_id], game.num_hands())
+            for child_node_id, action in ChildrenActionIt(node, game):
+                values[node_id][hand] += (strategy1[node_id][hand][action] * values[child_node_id][hand])
+        else:
+            values[node_id] = resize(values[node_id], game.num_hands())
+            for child_node_id in ChildrenIt(node):
+                for hand in range(game.num_hands()):
+                    values[node_id][hand] += values[child_node_id][hand]
+    
+    return values[0]
+
+def compute_ev2(game, strategy1, strategy2):
+
+    ev1 = sum(compute_ev(game, strategy1, strategy2))/game.num_hands()
+    ev2 = -1*sum(compute_ev(game, strategy2, strategy1))/game.num_hands()
+
+    return (ev1, ev2)
+
+def compute_immediate_regrets(game, strategies):
+    
+    tree = unroll_tree(game):
+    regrets = [[[0 for k in range(game.num_actions())] for j in range(game.num_hands())] for i in range(len(tree))]
+    
+    #TODO: finish this function

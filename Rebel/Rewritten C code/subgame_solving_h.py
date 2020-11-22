@@ -48,3 +48,13 @@ def get_query(game_name, traverser, state, reaches1, reaches2):
 
 def get_uniform_strategy(game, tree):
     pass
+
+
+class TreeStrategyStrats:
+
+    def __init__(self, tree=None, reach_probabilities=None, values=None, node_values=None, node_reach=None):
+        self.tree = tree
+        self.reach_probabilities = reach_probabilities
+        self.values = values
+        self.node_values = node_values
+        self.node_reach = node_reach
