@@ -139,8 +139,39 @@ def compute_ev2(game, strategy1, strategy2):
     return (ev1, ev2)
 
 def compute_immediate_regrets(game, strategies):
+
+    from .TreeSolvers import PartialTreeTraverser
     
     tree = unroll_tree(game):
     regrets = [[[0 for k in range(game.num_actions())] for j in range(game.num_hands())] for i in range(len(tree))]
-    
+    tree_traverser = PartialTreeTraverser(game, tree, None)
+    initial_beliefs = get_initial_beliefs(game)[0]
+    for strategy_id in range(len(strategies)):
+        last_strategies = strategies[strategy_id]
+        tree_traverser.precompute_reaches(last_strategies, initial_beliefs, 0)
+        tree_traverser.precompute_reaches(last_strategies, initial_beliefs, 1)
+        for traverser in range(2):
+            tree_traverser.precompute_all_leaf_values(traverser)
+            for public_node_id in range(len(tree)):
+                node = tree[public_node_id]
+                if node.num_children():
+                    state = node.state
+                    value = [0 for i in range(len(tree_traverser.traverser_values[public_node_id]))]
+                    if state.player_id == traverser:
+                        for child_node, action in ChildrenActionIt(node, game):
+                            action_value = tree_traverser.traverser_values[child_node]
+                            for hand in range(game.num_hands()):
+                                regrets[public_node_id][hand][action] += action_value[hand]
+                                value[hand] += (action_value[hand] * last_strategies[public_node_id][hand][action])
+                        for hand in range(game.num_hands()):
+                            for child_node, action in ChildrenActionIt(node, game):
+                                regrets[public_node_id][hand][action] -= value[hand]
+                    else:
+                        assert state.player_id == 1 - traverser
+                        for child_node in ChildrenIt(node):
+                            action_value = tree_traverser.traverser_values[child_node]
+                            for hand in range(game.num_hands()):
+                                value[hand] += action_value[hand]
+                    tree_traverser.traverser_values[public_node_id] = value
+
     #TODO: finish this function
