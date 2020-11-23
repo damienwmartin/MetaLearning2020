@@ -18,7 +18,6 @@ class PartialTreeTraverser:
         self.pseudo_leaves_indices = []
         self.terminal_indices = []
         self.value_net = value_net
-        self.leaf_values = None
         self.net_query_buffer = []
 
         if value_net:
@@ -37,21 +36,33 @@ class PartialTreeTraverser:
             if game.is_terminal(tree[node_id].state):
                 self.terminal_indices.append(node_id)
         
-        self.leaf_values = torch.empty(len(pseudo_leaves_indices), output_size)
+        self.leaf_values = torch.zeros(len(pseudo_leaves_indices), output_size)
         self.traverser_values = np.zeros(len(tree), game.num_hands)
         self.reach_probabilities = (np.zeros(len(tree), game.num_hands), np.zeros(len(tree), game.num_hands))
     
-    def add_training_example(traverser, values):
+    def add_training_example(self, traverser, values):
+        """
+        Adds a datapoint for the value_net
+        """
         query_tensor = torch.zeros(1, self.query_size)
-        value_tensor = torch.zeros(1, self.output_size)
-        pass
+        value_tensor = torch.tensor(values)
+        self.write_query(('root', ), traverser, query_tensor)
+        self.value_net.add_training_example(query_tensor, value_tensor)
 
-    def precompute_reaches(strategy, initial_beliefs, player):
+    def write_query(self, node_name, traverser, buffer):
+        """
+        Writes a single query to the buffer; the query corresponds to which node was seen by the traverser
+        """
+        state = self.game.node_to_state(node_name)
+        node_id = node_to_number(node_name)
+        write_index = write_query_to(self.game, traverser, state, self.reach_probabilities[0][node_id], self.reach_probabilities[1][node_id], buffer)
+
+    def precompute_reaches(self, strategy, initial_beliefs, player):
 
         compute_reach_probabilities(tree, strategy, initial_beliefs, player, reach_probabilities[player])
     
 
-    def precompute_all_leaf_values(traverser):
+    def precompute_all_leaf_values(self, traverser):
         self.query_value_net(traverser)
         self.populate_leaf_values()
         self.precompute_terminal_leaves_values()
@@ -63,13 +74,12 @@ class PartialTreeTraverser:
             traverser_values[node_id] = compute_expected_terminal_values(game, last_bid, tree[node_id].state.player_id != traverser, reach_probabilities[1 - traverser][node_id])
     
 
-    def populate_leaf_values():
+    def populate_leaf_values(self):
         if self.pseudo_leaves_indices != []:
-            result_acc = self.leaf_values[2] #TODO: WTF is torch::tensor.accessor<float, 2>
+            result_acc = self.leaf_values.cpu().numpy()
             for row in range(len(self.pseudo_leaves_indices)):
                 node_id = pseudo_leaves_indices[row]
-                for i in range(self.output_size):
-                    self.traverser_values[node_id][i] = result_acc[row][i]
+                self.traverser_values[node_id] = result_acc[row]
 
 
 class CFR(PartialTreeTraverser):
@@ -247,3 +257,24 @@ class CFR(PartialTreeTraverser):
     
     def get_hand_values(self, player_id):
         return self.root_values_means[player_id]
+
+
+def write_query_to(game, traverser, state, reaches1, reaches2, buffer):
+    """
+    Writes a query to something?
+    """
+
+    buffer[1] = state[1]
+    buffer[2] = traverser
+
+    write_index = 2
+    for action in range(game.num_actions):
+        write_index += 1
+        buffer[write_index] = int(action == state[0])
+    
+    buffer[write_index] = normalize_probabilities_safe(reaches1, EPSILON)
+    write_index += len(reaches1)
+    buffer[write_index] = normalize_probabilities_safe(reaches2, EPSILON)
+    write_index += len(reaches2)
+
+    return write_index
