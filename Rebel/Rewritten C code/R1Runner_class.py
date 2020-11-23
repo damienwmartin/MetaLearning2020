@@ -19,7 +19,7 @@ class R1Runner:
 
     def step():
         self.state = self.game.get_initial_state()
-        self.beliefs = ([1/self.game.num_hands()]*self.game.num_hands(), [1/self.game.num_hands()] * self.game.num_hands())
+        self.beliefs = ([1/self.game.num_hands]*self.game.num_hands, [1/self.game.num_hands] * self.game.num_hands)
 
         while not self.game.is_terminal(self.state):
             solver = None

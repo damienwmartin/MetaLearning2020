@@ -268,6 +268,9 @@ class CFR(PartialTreeTraverser):
     
     def get_hand_values(self, player_id):
         return self.root_values_means[player_id]
+    
+    def get_tree(self):
+        return self.tree
 
 
 
