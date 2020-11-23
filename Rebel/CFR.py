@@ -263,7 +263,7 @@ class CFR(PartialTreeTraverser):
 
 def write_query_to(game, traverser, state, reaches1, reaches2):
     """
-    Writes a query to something?
+    Creates the query tensor to be added to the value net
     """
 
     buffer = [state[1], traverser]
