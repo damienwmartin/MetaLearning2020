@@ -44,18 +44,19 @@ class PartialTreeTraverser:
         """
         Adds a datapoint for the value_net
         """
-        query_tensor = torch.zeros(1, self.query_size)
         value_tensor = torch.tensor(values)
-        self.write_query(('root', ), traverser, query_tensor)
+        query_tensor = torch.tensor(self.write_query(('root', ), traverser))
         self.value_net.add_training_example(query_tensor, value_tensor)
 
-    def write_query(self, node_name, traverser, buffer):
+    def write_query(self, node_name, traverser):
         """
         Writes a single query to the buffer; the query corresponds to which node was seen by the traverser
         """
         state = self.game.node_to_state(node_name)
         node_id = node_to_number(node_name)
-        write_index = write_query_to(self.game, traverser, state, self.reach_probabilities[0][node_id], self.reach_probabilities[1][node_id], buffer)
+        write_index, buffer = write_query_to(self.game, traverser, state, self.reach_probabilities[0][node_id], self.reach_probabilities[1][node_id], buffer)
+        assert write_index == self.query_size
+        return buffer
 
     def precompute_reaches(self, strategy, initial_beliefs, player):
 
@@ -222,13 +223,14 @@ class CFR(PartialTreeTraverser):
             node_id = node['id']
             state = self.game.node_to_state(node_id)
             if state[1] == traverser and not node['terminal']:
-                start, end = self.game.get_bid_ranges(node.state)
+                start, end = self.game.get_bid_ranges(state)
                 self.sum_strategies[node_id] *= strat_discount
                 self.sum_strategies[node_id] += np.vstack([self.reach_probabilities_buffer[node_id]]*game.num_actions, 1)*self.last_strategies[node_id]
                 for hand in range(self.game.num_hands):
-                    for action in range(start, end):
-                        self.regrets[node_id][hand][action] *= (pos_discount if self.regrets[node_id][hand][action] > 0 else neg_discount)
-                    self.average_strategies[node_id][hand] = normalize_probabilities_safe(sum_strategies[node_id][hand])
+                    if params.dcfr:
+                        for action in range(start, end):
+                            self.regrets[node_id][hand][action] *= (pos_discount if self.regrets[node_id][hand][action] > 0 else neg_discount)
+                    self.average_strategies[node_id][hand] = normalize_probabilities_safe(self.sum_strategies[node_id][hand])
 
         self.num_steps[traverser] += 1
     
@@ -259,22 +261,18 @@ class CFR(PartialTreeTraverser):
         return self.root_values_means[player_id]
 
 
-def write_query_to(game, traverser, state, reaches1, reaches2, buffer):
+def write_query_to(game, traverser, state, reaches1, reaches2):
     """
     Writes a query to something?
     """
 
-    buffer[1] = state[1]
-    buffer[2] = traverser
-
-    write_index = 2
+    buffer = [state[1], traverser]
     for action in range(game.num_actions):
-        write_index += 1
-        buffer[write_index] = int(action == state[0])
-    
-    buffer[write_index] = normalize_probabilities_safe(reaches1, EPSILON)
-    write_index += len(reaches1)
-    buffer[write_index] = normalize_probabilities_safe(reaches2, EPSILON)
-    write_index += len(reaches2)
+        buffer.append(int(action == state[0]))
 
-    return write_index
+    buffer.extend(normalize_probabilities_safe(reaches1, EPSILON))
+    buffer.extend(normalize_probabilities_safe(reaches2, EPSILON))
+
+    write_index = len(buffer)
+
+    return write_index, buffer
