@@ -1,7 +1,8 @@
 #psuedocode for the rebel overall rebel algorithm
 
-import numpy
+import numpy as np
 from game_tree import game_tree
+from .CFR import CFR
 
 '''
 Undefined functions in here
@@ -18,10 +19,13 @@ Subgame (G) - Depth limited tree of game states
 
  '''
 
+
 def ReBeL(PBS, v_net, p_net, D_v, D_p, T, game_wrapper):
 	while not PBS.is_terminal:
 		#Build game tree going forward n actions from start node
 		G = game_tree(game_wrapper)
+		beliefs = np.ones(game_wrapper.game.num_hands()) / game_wrapper.game.num_hands()
+		agent = CFR(game_wrapper.game, game_tree, v_net, beliefs, params)
 		G.construct_subgame(PBS)
 
 		#initialize policy using the policy network
@@ -40,10 +44,13 @@ def ReBeL(PBS, v_net, p_net, D_v, D_p, T, game_wrapper):
 		for t in range(t_warm+1, T):
 			
 			#Update policy using one iteration of CFR etc
-			pi_t = update_policy(G, pi_t)
+			#pi_t = update_policy(G, pi_t)
+			agent.step()
+			pi_t = agent.last_strategies
 
 			#update average policy
-			pi_bar = (t-1)/float(t+1) * pi_bar + 2/float(t+1) * pi_t
+			#pi_bar = (t-1)/float(t+1) * pi_bar + 2/float(t+1) * pi_t
+			pi_bar = agent.average_strategies
 
 			#Recalculate leaf values using new policy
 			G.set_leaf_values(pi_t, v_net)
