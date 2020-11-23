@@ -15,6 +15,7 @@ class RPS():
 		self.num_infostates = 9
 
 
+	
 	def get_legal_moves(self, PBS):
 		'''
 		0 -> Rock
@@ -31,7 +32,7 @@ class RPS():
 		special_hand = PBS.public
 		payout_matrix[:,special_hand] = payout_matrix[:,special_hand]*2
 		payout_matrix[special_hand,:] = payout_matrix[special_hand,:]*2
-		reward = np.multiply(payout_matrix, PBS.infostate_matrix).sum().sum()
+		reward = np.multiply(payout_matrix, PBS.infostate_matrix()).sum().sum()
 		return(reward)
 
 	
