@@ -97,12 +97,18 @@ class CFR(PartialTreeTraverser):
         self.precompute_all_leaf_values(traverser)
 
         for public_node in self.tree.nodes:
-            if node['subgame_terminal']:
+            if public_node['subgame_terminal']:
                 state = node['state']
                 value = np.zeros_like(self.traverser_values[public_node_id])
                 if state.player_id == traverser:
-                    # Numpy array that represent 
-                    action_values = np.vstack([self.traverser_values[child_node] for child_node in nodes.children], 1)
+                    # Numpy array that represent
+
+                    action_values = np.array([self.traverser_values[node_to_number(child_node)] if child_node else [0]*game.num_hands() for action, child_node in public_node.children)
+                    regrets[node_to_number(public_node)] += np.transpose(action_values)
+
+                    iter child_node, action: (node, game)
+                    action_value = self.traverser_values[child_node]
+                    
                     
                 else:
                         

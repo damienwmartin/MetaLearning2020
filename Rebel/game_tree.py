@@ -21,16 +21,10 @@ class recursive_game_tree():
 	-Depth: how deep
 	-PBS
 	-Policy
-<<<<<<< HEAD
 	-Terminal (both actually terminal and term)
-=======
-	-Value
-	-terminal
->>>>>>> 9ef9e142a703d752b2c1b7778d9f2a5d767af3f2
 
 	'''
-	def __init__ (self, PBS):
-		self.tree = nx.DiGraph() 
+	def __init__ (self, PBS): 
 		self.tree.add_node(('root',), depth=0, PBS=PBS)
 
 
@@ -230,12 +224,14 @@ def node_to_number(node, game='liarsdice'):
 	"""
 	Enumerates the nodes with a uniue node_id. This node_id corresponds to enumerating each node level by level (with the root_node being 0)
 	"""
-	node_id = None
+	node_id = 0
 	if game == 'liarsdice':
-		node_id = binom(game.num_actions(), node['depth'] - 1)
-		last_action = node['id'][-1]
-		for i in range(depth, last_action):
+		for i in range(node['depth']):
+			node_id += binom(game.num_actions(), i)
+		last_action = node['id'][-2] if len(node['id']) > 2 else 0
+		for i in range(node['depth'], last_action):
 			node_id += (game.num_actions() - i)
+		node_id += last_action
 	else:
 		raise Exception("The game can only be 'liarsdice'. ")
 	return node_id
