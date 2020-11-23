@@ -1,6 +1,8 @@
 import numpy as np
 import torch
+from .game_tree import node_to_number
 
+EPSILON = 1e-100
 
 class PartialTreeTraverser:
 
@@ -36,7 +38,7 @@ class PartialTreeTraverser:
                 self.terminal_indices.append(node_id)
         
         self.leaf_values = torch.empty(len(pseudo_leaves_indices), output_size)
-        self.traverser_values = [[0 for j in range(game.num_hands())] for i in range(len(tree))]
+        self.traverser_values = np.zeros(len(tree), game.num_hands())
         self.reach_probabilities = ([[0 for j in range(game.num_hands())] for i in range(len(tree))], [[0 for j in range(len(tree))] for i in range(game.num_hands())])
     
     def add_training_example(traverser, values):
@@ -92,26 +94,28 @@ class CFR(PartialTreeTraverser):
     
     def update_regrets(self, traverser):
         """
+        Computes the regrets associated with a traverser and stores the result in self.regrets
         """
         self.precompute_reaches(self.last_strategies, self.initial_beliefs)
         self.precompute_all_leaf_values(traverser)
 
         for public_node in self.tree.nodes:
+            public_node_id = node_to_number(public_node)
             if public_node['subgame_terminal']:
                 state = node['state']
                 value = np.zeros_like(self.traverser_values[public_node_id])
+                action_values = np.array([self.traverser_values[node_to_number(child_node)] if child_node else [0]*game.num_hands() for action, child_node in public_node.children) # Need to change way to iterate
                 if state.player_id == traverser:
-                    # Numpy array that represent
-
-                    action_values = np.array([self.traverser_values[node_to_number(child_node)] if child_node else [0]*game.num_hands() for action, child_node in public_node.children)
-                    regrets[node_to_number(public_node)] += np.transpose(action_values)
-
-                    iter child_node, action: (node, game)
-                    action_value = self.traverser_values[child_node]
-                    
+                    regrets[public_node_id] += np.transpose(action_values)
+                    value += np.sum(action_value * np.transpose(self.last_strategies[public_node_id]), axis=0)
+                    regrets[public_node_id] -= np.vstack([value]*game.num_actions(), 1) # Change to 0 for invalid actions
                     
                 else:
-                        
+                    assert state.player_id == 1 - traverser
+                    value += action_values
+            
+                self.traverser_values[public_node_id] = value
+                    
 
 """
         for public_node_id in range(len(self.tree)):
@@ -147,8 +151,13 @@ class CFR(PartialTreeTraverser):
 
         alpha = 2 /(self.num_steps[traverser] + 2) if self.params.linear_update else 1 / (self.num_steps[traverser] + 1)
         self.root_values_means[traverser] = resize(self.root_values_means(traverser), len(self.root_values[traverser]))
+
+        self.root_values_means[traverser] += alpha*(self.root_values[traverser] - self.root_values_means[traverser])
+
+        """
         for i in range(len(self.root_values[traverser])):
             self.root_values_means[traverser][i] += (self.root_values[traverser][i] - self.root_values_means[traverser][i])*alpha
+        """
 
         pos_discount = 1
         neg_discount = 1
@@ -166,6 +175,7 @@ class CFR(PartialTreeTraverser):
                 neg_discount = num_strategies**self.params.dcfr_beta / (num_strategies**self.params.dcfr_beta + 1)
             strat_discount = (num_strategies / (num_strategies + 1))**self.params.dcfr_gamma
         
+        """
         for node_id in range(len(self.tree)):
             if self.tree[node_id].num_children() and self.tree[node_id].state.player_id == traverser:
                 start, end = self.game.get_bid_ranges(self.tree[node_id].state)
@@ -173,9 +183,18 @@ class CFR(PartialTreeTraverser):
                     for action in range(start, end):
                         self.last_strategies[node_id][hand][action] = max(regrets[node_id][hand][action], EPSILON)
                     last_strategies[node][hand] = normalize_probabilities_safe(last_strategies[node][hand])
-        
+        """
+
+        for node in self.tree.nodes:
+            if node.state.player_id == traverser and not node['is_terminal']:
+                start, end = self.game.get_bid_ranges(node.state)
+                self.last_strategies[node_id] = np.max(regrets[node_id], EPSILON)
+                for hand in range(self.game.num_hands()):
+                    self.last_strategies[node][hand] = normalize_probabilities_safe(self.last_strategies[node][hand])
+
         compute_reach_probabilities(self.tree, self.last_strategies, self.initial_beliefs[traverser], traverser, self.reach_probabilities_buffer)
 
+        """
         for node_id in range(len(self.tree)):
             if self.tree[node_id].num_children() and self.tree[node_id].state.player_id == traverser:
                 action_begin, action_end = self.game.get_bid_ranges(self.tree[node_id].state)
@@ -185,7 +204,18 @@ class CFR(PartialTreeTraverser):
                         self.sum_strategies[node_id][hand][action] *= strat_discount
                         self.sum_strategies[node_id][hand][action] += (self.reach_probabilities_buffer[node_id][hand] * self.last_strategies[node_id][hand][action])
                         self.average_strategies[node_id][hand] = normalize_probabilities_safe(sum_strategies[node_id][hand])
-        
+        """
+
+        for node in self.tree.nodes:
+            if node.state.player_id == traverser and not node['terminal']:
+                start, end = self.game.get_bid_ranges(node.state)
+                self.sum_strategies[node_id] *= strat_discount
+                self.sum_strategies[node_id] += np.vstack([self.reach_probabilities_buffer[node_id]]*game.num_actions(), 1)*self.last_strategies[node_id]
+                for hand in range(self.game.num_hands()):
+                    for action in range(start, end):
+                        self.regrets[node_id][hand][action] *= (pos_discount if self.regrets[node][hand][action] > 0 else neg_discount)
+                    self.average_strategies[node_id][hand] = normalize_probabilities_safe(sum_strategies[nodei_id][hand])
+
         self.num_steps[traverser] += 1
     
     def multistep(self, traverser):
