@@ -1,5 +1,7 @@
 import networkx as nx
 import numpy as np
+from scipy.special import binom
+
 '''
 Implentation for the game trees and wrappers for different game libraries
 ReBeL only interacts with the subgame tree so if we place the wrapper here the rest should be application independant
@@ -16,9 +18,10 @@ class recursive_game_tree():
 	Node Ids are tuple with all actions taken from root e.g. ('root', 'raise', 'call', 'fold')
 	
 	Node Attributes
-	-Depth
+	-Depth: how deep
 	-PBS
 	-Policy
+	-Terminal (both actually terminal and term)
 
 	'''
 	def __init__ (self, PBS): 
@@ -215,3 +218,18 @@ def set_leaf_values(PBS, Policies, value_net):
 	else:
 		for action in possible_actions:
 			set_leaf_values(PBS.transition(action, policy, 1-player_number))
+
+
+def node_to_number(node, game='liarsdice'):
+	"""
+	Enumerates the nodes with a uniue node_id. This node_id corresponds to enumerating each node level by level (with the root_node being 0)
+	"""
+	node_id = None
+	if game == 'liarsdice':
+		node_id = binom(game.num_actions(), node['depth'] - 1)
+		last_action = node['id'][-1]
+		for i in range(depth, last_action):
+			node_id += (game.num_actions() - i)
+	else:
+		raise Exception("The game can only be 'liarsdice'. ")
+	return node_id

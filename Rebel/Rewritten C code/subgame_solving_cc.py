@@ -174,4 +174,4 @@ def compute_immediate_regrets(game, strategies):
                                 value[hand] += action_value[hand]
                     tree_traverser.traverser_values[public_node_id] = value
 
-    #TODO: finish this function
+    #TODO: finish this function  

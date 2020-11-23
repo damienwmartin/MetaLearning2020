@@ -36,7 +36,7 @@ class LiarsDice(game_wrapper):
         return self.game.act(state, action)
     
     def pbs2gamestate(self, pbs):
-        return 
+        return
 
     def gamestate2public_state(self, game_state):
         return (game_state[0], game_state[1])
