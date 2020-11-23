@@ -24,9 +24,10 @@ class recursive_game_tree():
 	-Terminal (both actually terminal and term)
 
 	'''
-	def __init__ (self, PBS): 
+	def __init__ (self, PBS, game): 
+		self.tree = nx.DiGraph()
+		self.game = game
 		self.tree.add_node(('root',), depth=0, PBS=PBS)
-
 
 	def build_depth_limited_subgame(self, depth_limit = 5, node_id = ('root',)):
 		'''
@@ -34,6 +35,8 @@ class recursive_game_tree():
 		Mark nodes which are subgame terminal
 		'''
 		node = self.tree.nodes[node_id]
+		#initialize uniform_policy
+		node['policy'] = np.ones(self.game.num_actions)/self.game.num_actions
 		if node['depth'] < depth_limit:
 			node['subgame_terminal'] = False
 			self.expand_node(node_id)
@@ -118,7 +121,8 @@ class recursive_game_tree():
 
 	def expand_node(self, node_id):
 		# Spawn a child node for every available actions
-		legal_actions = self.game.get_legal_moves(pbs)
+		PBS = self.tree.nodes[node_id]['PBS']
+		legal_actions = self.game.get_legal_moves(PBS)
 		
 		for action in legal_actions:
 			self.add_child(node_id, action)
@@ -141,10 +145,10 @@ class recursive_game_tree():
 
 		#If terminal get the payouts from the game and weight by probability of history
 		if terminal := self.game.is_terminal(new_pbs):
-			value = np.multiply(self.game.get_rewards(new_pbs), new_pbs.infostate_matrix).sum().sum()
+			value = np.multiply(self.game.get_rewards(new_pbs), new_pbs.infostate_matrix()).sum().sum()
 
 		self.tree.add_node(new_node_id, depth = new_depth, PBS = new_pbs, terminal=terminal)
-		self.tree.add_edges(node_id, new_node_id, action=action)
+		self.tree.add_edge(node_id, new_node_id, action=action)
 
 
 	def transition(self, pbs, action, policy = None):
@@ -152,15 +156,10 @@ class recursive_game_tree():
 		given a PBS and an actions spawn the next PBS
 		'''
 		#reach out to the game wrapper for the next public state
-		next_public_state = self.game.take_action(action, pbs) 
+		next_public_state = self.game.take_action(pbs, action) 
 		
 		#Get the next distribution of infostates if policy exists
-		if policy != None:
-			next_infostate_probs = pbs.update_infostate_probs(policy, action, player_number)
-
-		#If playing with a random policy nothing is learned
-		else:
-			next_infostate_probs = pbs.infostate_probs
+		next_infostate_probs = pbs.update_infostate_probs(policy, action)
 
 		#return a new updated pbs after taking action
 		return(PBS(next_public_state, next_infostate_probs))
@@ -175,16 +174,15 @@ class PBS():
 	'''
 	Containts all public knowledge of knowledge and probability distribution for each players infostates
 	For liars dice public is players turn, last bid, and probability distribution of each players hands
+	TODO:Pull player number out into its own variable
 	'''
 	def __init__(self, public_state, infostate_probs):
-		
-
 		#representation of public state for the game
 		self.public = public_state
 		#list of probability matrices for each players infostate, (# players, infostate size)
 		self.infostate_probs = infostate_probs 		
 		
-	def update_infostate_probs(self, policy, action, player_number):
+	def update_infostate_probs(self, policy, action):
 		'''
 		policy is for the state - size (# infostates, actions)
 		beyes update infostate posterior(state) ~ prior(state)*p(a|state)
@@ -192,6 +190,7 @@ class PBS():
 		player_number is whose beliefs you're updating
 
 		'''
+		player_number = self.public[0]
 		new_infostate_probs = self.infostate_probs.copy()
 		new_infostate_probs[player_number] = self.infostate_probs[player_number] * policy[action]/sum(self.infostate_probs[player_number] * policy[action])
 		return(new_infostate_probs)
@@ -200,7 +199,7 @@ class PBS():
 		'''
 		Joint probability of each players possible hands give infostate. 
 		'''
-		return(np.self.infostate_probs[0].T,self.infostate_probs[1])
+		return(np.outer(self.infostate_probs[0].T,self.infostate_probs[1]))
 
 
 	def vector(self):
