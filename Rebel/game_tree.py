@@ -21,10 +21,16 @@ class recursive_game_tree():
 	-Depth: how deep
 	-PBS
 	-Policy
+<<<<<<< HEAD
 	-Terminal (both actually terminal and term)
+=======
+	-Value
+	-terminal
+>>>>>>> 9ef9e142a703d752b2c1b7778d9f2a5d767af3f2
 
 	'''
-	def __init__ (self, PBS): 
+	def __init__ (self, PBS):
+		self.tree = nx.DiGraph() 
 		self.tree.add_node(('root',), depth=0, PBS=PBS)
 
 
