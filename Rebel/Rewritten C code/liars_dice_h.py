@@ -57,3 +57,17 @@ class LiarsDice_C():
             raise Exception("Action invalid")
         else:
             return (action, 1 - state.player)
+    
+    def iter_at_node(self, node_id):
+        last_action = node_id[-1]
+        for i in range(self.num_actions):
+            if i > last_action:
+                yield i, node_id + i
+            else:
+                yield i, None
+    
+    def node_to_state(self, node_id):
+        if len(node_id) == 1:
+            return self.get_initial_state()
+        else:
+            return (node_id[-1], (len(node_id) - 1) % 2)
