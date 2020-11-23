@@ -13,6 +13,7 @@ class RPS():
 	def __init__(self):
 		self.num_actions = 3
 		self.num_infostates = 9
+		self.num_hands = 3
 
 
 	def get_legal_moves(self, PBS):
@@ -41,7 +42,6 @@ class RPS():
 		hand2 = np.random.choice([0,1,2], p=PBS.infostate_probs[0])
 		return(np.array(hand1, hand2))
 
-		
 
 	def take_action(self, PBS, action):
 		#returns next public state, only change is the players turn
@@ -51,6 +51,27 @@ class RPS():
 
 	def is_terminal(self, PBS):
 		return(PBS.public[0]==1)
+	
+	"""
+	NOTE: The functions below are really sketch; not sure how to represent this
+	"""
+	
+	def iter_at_node(self, node_id):
+		if node_id == ('root', ):
+			for action in [0, 1, 2]:
+				yield action, None
 
+	def node_to_state(self, node_id):
+		if node_id == ('root', ):
+			return (-1, 0)
+		else:
+			return (node_id[-1], len(node))
+	
+	def node_to_number(self, node_id):
+		if node_id == ('root', ):
+			return 0
+		else:
+			return 1
+		
 
 		

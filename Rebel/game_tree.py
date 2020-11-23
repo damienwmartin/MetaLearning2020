@@ -208,21 +208,3 @@ class PBS():
 		Numpy array representation -> input into value/policy net
 		'''
 		return(np.concat([self.public_state, *self.infostate_probs]))
-
-
-
-def node_to_number(node, game='liarsdice'):
-	"""
-	Enumerates the nodes with a uniue node_id. This node_id corresponds to enumerating each node level by level (with the root_node being 0)
-	"""
-	node_id = 0
-	if game == 'liarsdice':
-		for i in range(node['depth']):
-			node_id += binom(game.num_actions(), i)
-		last_action = node['id'][-2] if len(node['id']) > 2 else 0
-		for i in range(node['depth'], last_action):
-			node_id += (game.num_actions() - i)
-		node_id += last_action
-	else:
-		raise Exception("The game can only be 'liarsdice'. ")
-	return node_id

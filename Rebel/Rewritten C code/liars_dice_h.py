@@ -43,6 +43,9 @@ class LiarsDice_C():
         return (K_INITIAL_ACTION, 0)
     
     def get_bid_range(self, state):
+        """
+        Returns a tuple (start, end) which represent all possible legal actions that can be taken from that state
+        """
         if state[0] == K_INITIAL_ACTION:
             return (0, self.num_actions - 1)
         else:
@@ -67,7 +70,24 @@ class LiarsDice_C():
                 yield i, None
     
     def node_to_state(self, node_id):
+        """
+        Converts a node into a tuple of (last_action, current_player)
+        """
         if len(node_id) == 1:
             return self.get_initial_state()
         else:
             return (node_id[-1], (len(node_id) - 1) % 2)
+    
+    def node_to_number(self, node):
+        """
+        Enumerates each of the nodes with a unique node_id. This node_id correspond to enumerating across each depth level (with the root node having an id of 0)
+        """
+        node_id = 0
+        for i in range(node['depth']):
+			node_id += binom(self.num_actions, i)
+		last_action = node['id'][-2] if len(node['id']) > 2 else 0
+		for i in range(node['depth'], last_action):
+			node_id += (self.num_actions - i)
+		node_id += last_action
+
+        return node_id

@@ -24,8 +24,8 @@ def ReBeL(PBS, v_net, p_net, D_v, D_p, T, game_wrapper):
 	while not PBS.is_terminal:
 		#Build game tree going forward n actions from start node
 		G = game_tree(game_wrapper)
-		beliefs = np.ones(game_wrapper.game.num_hands()) / game_wrapper.game.num_hands()
-		agent = CFR(game_wrapper.game, game_tree, v_net, beliefs, params)
+		beliefs = np.ones(game_wrapper.num_hands) / game_wrapper.num_hands
+		agent = CFR(game_wrapper, game_tree, v_net, beliefs, params)
 		G.construct_subgame(PBS)
 
 		#initialize policy using the policy network

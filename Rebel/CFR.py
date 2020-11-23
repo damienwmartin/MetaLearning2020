@@ -10,10 +10,8 @@ class PartialTreeTraverser:
 
         self.game = game
         self.tree = tree
-        self.reach_probabilities = None
-        self.traverser_values = None
         self.query_size = get_query_size(game)
-        self.output_size = game.num_hands()
+        self.output_size = game.num_hands
 
         self.pseudo_leaves_indices = []
         self.terminal_indices = []
@@ -21,19 +19,19 @@ class PartialTreeTraverser:
         self.net_query_buffer = []
 
         if value_net:
-            for node_id in range(len(tree)):
-                node = tree[node_id]
-                state = node.state
-                if not node.num_children() and not game.is_terminal(state):
+            for node in self.tree.nodes:
+                node_id = node['id']
+                if node['subgame_terminal'] and not node['terminal']:
                     # Pseudo-leaves are nodes which are leaves in our depth-limited subgame but not actually terminal states in the game
                     self.pseudo_leaves_indices.append(node_id)
         else:
-            for node in tree:
-                if not node.num_children() and not game.is_terminal(state):
+            for node in self.tree.nodes:
+                if node['subgame_terminal'] and not node['terminal']:
                     raise Exception("Found a node that is a non-final leaf. Either provide a value net or increase max_depth.")
 
-        for node_id in range(len(tree)):
-            if game.is_terminal(tree[node_id].state):
+        for node in self.tree.nodes:
+            node_id = node['id']
+            if node['terminal']:
                 self.terminal_indices.append(node_id)
         
         self.leaf_values = torch.zeros(len(pseudo_leaves_indices), output_size)
@@ -48,7 +46,7 @@ class PartialTreeTraverser:
         query_tensor = torch.tensor(self.write_query(('root', ), traverser))
         self.value_net.add_training_example(query_tensor, value_tensor)
 
-    def write_query(self, node_name, traverser):
+    def write_query(self, node_id, traverser):
         """
         Writes a single query to the buffer; the query corresponds to which node was seen by the traverser
         """
@@ -59,7 +57,6 @@ class PartialTreeTraverser:
         return buffer
 
     def precompute_reaches(self, strategy, initial_beliefs, player):
-
         compute_reach_probabilities(tree, strategy, initial_beliefs, player, reach_probabilities[player])
     
 
@@ -73,6 +70,18 @@ class PartialTreeTraverser:
         for node_id in self.terminal_indices:
             last_bid = self.tree[self.tree[node_id].parent].state.last_bid
             traverser_values[node_id] = compute_expected_terminal_values(game, last_bid, tree[node_id].state.player_id != traverser, reach_probabilities[1 - traverser][node_id])
+    
+    def query_value_net(self, traverser):
+        if self.pseudo_leaves_indices != []:
+            N = len(self.pseudo_leaves_indices)
+            scalers = []
+            for row in range(N):
+                node_id = self.pseudo_leaves_indices(row):
+                self.net_query_buffer.extend(self.write_query(node_id, traverser))
+                scalers.append(np.sum(self.reach_probabilities[1 - traverser][node_id]))
+            scalers = torch.tensor(scalers)
+            self.leaf_values = self.value_net.compute_values(np.reshape(np.array(self.net_query_buffer), (N, self.query_size)))
+            self.leaf_values *= scalers.unsqueeze(1)
     
 
     def populate_leaf_values(self):
@@ -112,8 +121,8 @@ class CFR(PartialTreeTraverser):
 
         for public_node in self.tree.nodes:
             public_node_id = node_to_number(public_node)
-            if public_node['subgame_terminal']:
-                state = node['state']
+            if not public_node['subgame_terminal'] and not public_node['terminal']:
+                state = self.game.node_to_state(public_node)
                 value = np.zeros_like(self.traverser_values[public_node_id])
                 action_values = np.array([self.traverser_values[child_node_id] if child_node_id else [0]*game.num_hands for action, child_node_id in self.game.iter_at_node(public_node_id)) # Need to change way to iterate
                 if state.player_id == traverser:
