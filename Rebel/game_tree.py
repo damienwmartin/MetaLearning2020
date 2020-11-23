@@ -19,9 +19,12 @@ class recursive_game_tree():
 	-Depth
 	-PBS
 	-Policy
+	-Value
+	-terminal
 
 	'''
-	def __init__ (self, PBS): 
+	def __init__ (self, PBS):
+		self.tree = nx.DiGraph() 
 		self.tree.add_node(('root',), depth=0, PBS=PBS)
 
 
