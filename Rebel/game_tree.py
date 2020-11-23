@@ -141,7 +141,7 @@ class recursive_game_tree():
 
 		#If terminal get the payouts from the game and weight by probability of history
 		if terminal := self.game.is_terminal(new_pbs):
-			value = np.multiply(self.game.infostate_values(new_pbs), new_pbs.infostate_matrix).sum().sum()
+			value = np.multiply(self.game.get_rewards(new_pbs), new_pbs.infostate_matrix).sum().sum()
 
 		self.tree.add_node(new_node_id, depth = new_depth, PBS = new_pbs, terminal=terminal)
 		self.tree.add_edges(node_id, new_node_id, action=action)
@@ -178,8 +178,7 @@ class PBS():
 	'''
 	def __init__(self, public_state, infostate_probs):
 		
-		#wrapper for the specific game we are playing
-		self.game = game_wrapper
+
 		#representation of public state for the game
 		self.public = public_state
 		#list of probability matrices for each players infostate, (# players, infostate size)
@@ -210,17 +209,6 @@ class PBS():
 		'''
 		return(np.concat([self.public_state, *self.infostate_probs]))
 
-#This is being moved into the game tree
-def set_leaf_values(PBS, Policies, value_net):
-	#If node ends in subgame but not the full game predict value with v_net
-	
-	if is_leaf(PBS):
-		vs = value_net(PBS.vector)
-		game_tree.add_node(pbs = PBS, value = vs)
-	
-	else:
-		for action in possible_actions:
-			set_leaf_values(PBS.transition(action, policy, 1-player_number))
 
 
 def node_to_number(node, game='liarsdice'):
