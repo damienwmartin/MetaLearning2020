@@ -148,7 +148,7 @@ class LiarsDice(game_wrapper):
             if state[1] == br_sampler and eps < random_action_prob:
                 action = np.random.randint(action_begin, action_end)
             else:
-                beliefs = sampling_beliefs[state.player_id]
+                beliefs = sampling_beliefs[state[1]]
                 hand = np.random.choice(beliefs.size(), 1, p=beliefs)
                 policy = strategy[node_id][hand]
                 action = np.random.choice(policy.size(), 1, p=policy)
@@ -163,7 +163,7 @@ class LiarsDice(game_wrapper):
         
         for node_id, action in path:
             policy = solver.get_belief_propagation_strategy()[node_id]
-            sampling_beliefs[self.state.player_id] = policy[:, action]
+            sampling_beliefs[state[1]] = policy[:, action]
             normalize_beliefs_inplace(self.beliefs[state[1]])
     
         return path

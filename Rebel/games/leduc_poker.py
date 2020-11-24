@@ -8,6 +8,8 @@ class Leduc(game_wrapper):
         self.num_suits = num_suits
     
     def get_legal_moves(self, state):
+        if state == 0:
+            return 
         pass
 
     def get_rewards(self, state):

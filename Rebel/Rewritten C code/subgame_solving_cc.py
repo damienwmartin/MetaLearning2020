@@ -106,6 +106,11 @@ def compute_strategy_stats(game, strategy):
     #TODO: Finish this function!
 
 def compute_ev(game, strategy1, strategy2):
+    """
+    strategies are nodes by hands by action
+    Expected value with respect to the player with strategy1
+    Returns expected value for each hand
+    """
     tree = unroll_tree(game)
     op_reach_probabilities = [[0 for i in range(game.num_hands())] for j in range(len(tree))]
     values = [[] for i in range(len(tree))]
