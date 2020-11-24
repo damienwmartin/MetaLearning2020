@@ -332,8 +332,6 @@ def get_uniform_reach_weighted_strategy(game, tree, initial_beliefs):
             if not node['terminal'] and state[1] == traverser:
                 for action in game.get_legal_moves(node):
                     strategy[node, :, action] *= reach_probabilities_buffer[node]
-        
-        return strategy
 
         """
         for node in range(len(tree)):
@@ -348,7 +346,9 @@ def get_uniform_reach_weighted_strategy(game, tree, initial_beliefs):
 
 
 def compute_expected_terminal_values(game, last_bid, inverse, op_reach_probabilities):
-    
+    """
+    Computes the 
+    """
     inv = 2*int(inverse) - 1
     values = compute_win_probability(game, last_bid, op_reach_probabilities)
     belief_sum = sum(op_reach_probabilities)
@@ -361,4 +361,4 @@ def compute_expected_terminal_values(game, last_bid, inverse, op_reach_probabili
 
 def get_query_size(game):
 
-    return 1 + 1 + game.num_actions() + game.num_hands()*2
+    return 1 + 1 + game.num_actions + game.num_hands*2
