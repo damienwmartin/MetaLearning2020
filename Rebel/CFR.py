@@ -291,41 +291,58 @@ def write_query_to(game, traverser, state, reaches1, reaches2):
     return write_index, buffer
 
 
-def compute_reach_probabilities(tree, strategy, initial_beliefs, player, reach_probabilities):
+def compute_reach_probabilities(game, tree, strategy, initial_beliefs, player, reach_probabilities):
     """
     Recomputes the probability that a certain node is reached
     """
-    num_hands = len(initial_beliefs)
-    for node_id in range(len(tree)):
-        if node_id:
-            node = tree[node_id]
-            state = node.state
-            last_action_player_id = tree[node.parent].state.player_id
-            last_action = state.last_bid
+ 
+    for node in tree.nodes:
+        if node['id'] != ('root', ):
+            parent_node = tree.nodes[node['id'][:-1]]
+            state = game.node_to_state(node)
+            last_action_player_id = game.node_to_state(parent_node)[1]
+            last_bid = state[0]
+
+            node_id = game.node_to_number(node)
+            parent_node_id = game.node_to_number(parent_node)
+
 
             if player == last_action_player_id:
-                for hand in range(game.num_hands()):
-                    reach_probabilities[node_id][hand] = reach_probabilities[node.parent][hand]*strategy[node.parent][hand][last_action]
+                reach_probabilities[node_id] = reach_probabilities[parent_node_id]*strategy[parent_node_id, :, last_action]
+            
             else:
-                reach_probabilities[node_id] = reach_probabilities[node.parent]
-
+                reach_probabilities[node_id] = reach_probabilities[parent_node_id]
         else:
-            reach_probabilities[node_id]= initial_beliefs
+            reach_probabilities[node_id] = initial_beliefs
 
 
 def get_uniform_reach_weighted_strategy(game, tree, initial_beliefs):
+    """
+    Gets a strategy that is weighted based on reach probabilities
+    """
 
     strategy = get_uniform_strategy(game, tree)
-    reach_probabilities_buffer = [[0 for i in range(tree.size())] for j in range(game.num_hands())]
+    reach_probabilities_buffer = np.zeros(len(tree), game.num_hands)
     
     for traverser in [0, 1]:
         compute_reach_probabilities(tree, strategy, initial_beliefs[traverser], traverser, reach_probabilities_buffer)
+
+        for node in tree.nodes:
+            state = game.node_to_state(node)
+            if not node['terminal'] and state[1] == traverser:
+                for action in game.get_legal_moves(node):
+                    strategy[node, :, action] *= reach_probabilities_buffer[node]
+        
+        return strategy
+
+        """
         for node in range(len(tree)):
             if tree[node].num_children() and tree_node.state.player_id == traverser:
                 action_begin, action_end = game.get_bid_range(tree[node].state)
                 for hand in range(game.num_hands()):
                     for action in range(action_begin, action_end):
                         strategy[node][hand][action] *= reach_probabilities_buffer[node][hand]
+        """
     
     return strategy
 

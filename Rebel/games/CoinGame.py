@@ -5,7 +5,6 @@ import numpy as np
 class CoinGame(game_wrapper):
 
     def __init__(self):
-        super().__init__()
         self.payoff_matrix_heads = np.array([[0.5, 0.5], [-1, 1]])
         self.payoff_matrix_tails = np.array([[-0.5, -0.5], [1, -1]])
 
