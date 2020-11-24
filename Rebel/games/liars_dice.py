@@ -7,8 +7,9 @@ class LiarsDice(game_wrapper):
     PBS are given as (action_id, player_id) pairs
     game_states are given as (action_id, player_id, hand_1, hand_2)
     """
-    K_INITIAL_ACTION = -1
     
+    
+    #NOTE: I think this needs to work with PBS distribution
     def get_rewards(self, state):
         if not state.is_terminal():
             return 0
@@ -17,19 +18,20 @@ class LiarsDice(game_wrapper):
             if self.game.num_matches(hand_1, face) + self.game.num_matches(hand_2, face) >= quantity:
                 if state[1]:
                     return 1
-                else
+                else:
                     return -1
-            else
+            else:
                 if state[1]:
                     return -1
                 else:
                     return 1
 
     def __init__(self, num_dice, num_faces):
+        self.K_INITIAL_ACTION = -1
         self.num_dice = num_dice
         self.num_faces = num_faces
         self.total_num_dice = 2 * num_dice
-        self.num_actions = 1 + total_num_dice*num_faces
+        self.num_actions = 1 + num_dice*num_faces
         self.num_hands = num_faces**num_dice
         self.liar_call = self.num_actions - 1 # Action ID for calling BS
         self.wild_face = num_faces -  1 # Face ID for the face considered "wild"
@@ -50,6 +52,7 @@ class LiarsDice(game_wrapper):
 
     def num_matches(self, hand, face):
         """
+        NOTE: Need to remember to ask what this is doing
         Hands are basically represented as numbers in base (self.num_faces)
         """
         matches = 0
@@ -63,13 +66,13 @@ class LiarsDice(game_wrapper):
         """
         States are represented as tuples of (action_id, player_id)
         """
-        return (K_INITIAL_ACTION, 0)
+        return (self.K_INITIAL_ACTION, 0)
     
     def get_bid_range(self, state):
         """
         Returns a tuple (start, end) which represent all possible legal actions that can be taken from that state
         """
-        if state[0] == K_INITIAL_ACTION:
+        if state[0] == self.K_INITIAL_ACTION:
             return (0, self.num_actions - 1)
         else:
             return (state[0] + 1, self.num_actions)
@@ -81,8 +84,8 @@ class LiarsDice(game_wrapper):
         return (state[0] == self.liar_call)
     
     def act(self, state, action):
-        bid_range = self.get_bid_range(state):
-        if (action < bid_range[0] or action >= bid_range[1])
+        bid_range = self.get_bid_range(state)
+        if (action < bid_range[0] or action >= bid_range[1]):
             raise Exception("Action invalid")
         else:
             return (action, 1 - state.player)
@@ -110,19 +113,20 @@ class LiarsDice(game_wrapper):
         """
         node_id = 0
         for i in range(node['depth']):
-			node_id += binom(self.num_actions, i)
-		last_action = node['id'][-2] if len(node['id']) > 2 else 0
-		for i in range(node['depth'], last_action):
-			node_id += (self.num_actions - i)
-		node_id += last_action
+            node_id += binom(self.num_actions, i)
+        last_action = node['id'][-2] if len(node['id']) > 2 else 0
+        for i in range(node['depth'], last_action):
+            node_id += (self.num_actions - i)
+        node_id += last_action
 
         return node_id
     
+    #NOTE: Not constant, posibly mask the total range in game tree
     def get_legal_moves(self, PBS):
-        start, end = self.get_bid_range(PBS):
+        start, end = self.get_bid_range(PBS)
         return [i for i in range(start, end)]
 
-	def sample_history(self, PBS, solver, random_action_prob, sampling_beliefs):
+    def sample_history(self, PBS, solver, random_action_prob, sampling_beliefs):
 
         # Samples a history from the PBS
 
@@ -160,4 +164,4 @@ class LiarsDice(game_wrapper):
             normalize_beliefs_inplace(self.beliefs[state[1]])
     
         return path
-		
+        
