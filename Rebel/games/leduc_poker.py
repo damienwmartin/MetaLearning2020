@@ -7,16 +7,23 @@ class Leduc(game_wrapper):
         self.num_ranks = num_ranks
         self.num_suits = num_suits
     
-    def get_legal_moves(self, game_state):
+    def get_legal_moves(self, state):
         pass
 
-    def get_rewards():
+    def get_rewards(self, state):
         pass
 
-    def is_terminal():
+    def is_terminal(self, state):
         pass
 
-    def take_action():
+    def take_action(self, state, action):
         pass
 
     def iter_at_node(self, node):
+        pass
+
+    def node_to_state(self, node):
+        pass
+
+    def node_to_number(self, node):
+        pass

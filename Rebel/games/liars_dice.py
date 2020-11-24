@@ -90,6 +90,9 @@ class LiarsDice(game_wrapper):
         else:
             return (action, 1 - state.player)
     
+    def take_action(self, node_name, state):
+        return node_name + (action, )
+    
     def iter_at_node(self, node_id):
         last_action = node_id[-1]
         for i in range(self.num_actions):
