@@ -27,9 +27,9 @@ class RPS():
 
 	def get_rewards(self, PBS):
 		#Needs to take a terminal game state and return rewards for each player
-		payout_matrix = np.array([[0, -1, 1],
-								  [1, 0, -1],
-								  [-1, 1, 0]])
+		payout_matrix = np.array([[1, 1, 1],
+								  [-1, -1, -1],
+								  [1, 1, 0]])
 		special_hand = PBS.public
 		payout_matrix[:,special_hand] = payout_matrix[:,special_hand]*2
 		payout_matrix[special_hand,:] = payout_matrix[special_hand,:]*2
@@ -51,7 +51,7 @@ class RPS():
 		return(new_public_state)
 
 	def is_terminal(self, PBS):
-		return(PBS.public[0]==1)
+		return(PBS.public[0]==0)
 	
 	"""
 	NOTE: The functions below are really sketch; not sure how to represent this

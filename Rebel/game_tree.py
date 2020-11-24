@@ -27,7 +27,7 @@ class recursive_game_tree():
 	def __init__ (self, PBS, game): 
 		self.tree = nx.DiGraph()
 		self.game = game
-		self.tree.add_node(('root',), depth=0, PBS=PBS)
+		self.tree.add_node(('root',), depth=0, PBS=PBS, terminal = False, subgame_terminal = False)
 
 	def build_depth_limited_subgame(self, depth_limit = 5, node_id = ('root',)):
 		'''
@@ -37,31 +37,44 @@ class recursive_game_tree():
 		node = self.tree.nodes[node_id]
 		#initialize uniform_policy
 		node['policy'] = np.ones(self.game.num_actions)/self.game.num_actions
-		if node['depth'] < depth_limit:
+		node['subgame_terminal'] = False
+		if node['depth'] == depth_limit:
+			node['subgame_terminal'] = True
+		
+		elif (node['depth'] < depth_limit) and (node['terminal'] == False):
 			node['subgame_terminal'] = False
 			self.expand_node(node_id)
 			children = list(self.tree.successors(node_id))
 			for child in children:
 				self.build_depth_limited_subgame(depth_limit, child)
-		if node['depth'] == depth_limit:
-			node['subgame_terminal'] = True
 
-	def initialize_random_policy(self):
-		''''
+
+
+
+
+#NOTE: Moved into build subgame
+#	def initialize_random_policy(self):
+		'''
 		Run through the tree and set all node policies to be uniform over available actions
 		Policy is (actions x infostates)
 		'''
-		for node_id, attributes in G.nodes.data():
-			actions = self.game.get_legal_moves(attributes['PBS'])
-			policy = {action:np.ones(self.game.num_infostates)/len(actions)}
+#		for node_id, attributes in G.nodes.data():
+#			actions = self.game.get_legal_moves(attributes['PBS'])
+#			policy = {action:np.ones(self.game.num_infostates)/len(actions)}
 
 	def set_leaf_values(self, value_net, node_id=('root',)):
 		#TODO: This is incomplete
 		node = self.tree.nodes[node_id] 
+		print(node_id)
 		
 
+		if node['terminal']:
+			print('setting terminal')
+			node['value'] = self.game.get_rewards(node['PBS'])
+
 		#Estimate values for nodes terminal in the subgame
-		if node['subgame_terminal'] and  not node['terminal']:
+		elif node['subgame_terminal']:
+			print('setting subgame_terminal')
 			node['value'] = value_net(node['PBS'].vector())
 
 		#Otherwise recursively rebuild the tree
@@ -81,9 +94,8 @@ class recursive_game_tree():
 		else:
 			node['value']=0
 			for action in self.game.get_legal_moves(['PBS']):
-				#sum(p(a)*v(T(s,a)))
-				node['value'] += node['policy']['action'].sum()*self.compute_ev(self.tree.nodes[(*node_id,action)]) 
-
+				node['value'] = node['value'] + node['policy'][action]*self.compute_ev((*node_id,action))
+			return(node['value'])
 
 	def sample_leaf(self):
 		node_id = ('root',)
@@ -148,7 +160,7 @@ class recursive_game_tree():
 			value = np.multiply(self.game.get_rewards(new_pbs), new_pbs.infostate_matrix()).sum().sum()
 
 		self.tree.add_node(new_node_id, depth = new_depth, PBS = new_pbs, terminal=terminal)
-		self.tree.add_edge(node_id, new_node_id, action=action)
+		self.tree.add_edge(node_id, new_node_id, action=action, weight=node['policy'][action])
 
 
 	def transition(self, pbs, action, policy = None):
