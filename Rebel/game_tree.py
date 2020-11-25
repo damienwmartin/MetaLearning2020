@@ -194,6 +194,7 @@ class PBS():
 	TODO:Pull player number out into its own variable
 	'''
 	def __init__(self, public_state, infostate_probs):
+		self.player_turn = 0
 		#representation of public state for the game
 		self.public = public_state
 		#list of probability matrices for each players infostate, (# players, infostate size)
