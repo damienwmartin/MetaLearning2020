@@ -3,20 +3,19 @@ Unit Tests for the Coin Game
 '''
 import unittest
 import numpy as np
-from game_wrappers import CoinGame
-
+from games.coin_game import CoinGame
 
 class TestCoinGame(unittest.TestCase):
     '''
     Requires any invalid inputs to result in throwing an exception (fail fast).
     '''
-    def setUp():
+    def setUp(self):
         self.game = CoinGame()
         self.invalid_nodes = [('root', 0, 1),
                               (0, 1),
                               ('root', 1, 1, 0)]
 
-    def tearDown():
+    def tearDown(self):
         del self.game
 
     def test_get_legal_moves(self):
@@ -55,86 +54,86 @@ class TestCoinGame(unittest.TestCase):
             node = ('root')
             action = 0
             expected_result = ('root', 0)
-            self.assertEqual(self.game.take_action(node), expected_result)
+            self.assertEqual(self.game.take_action(node, action), expected_result)
 
         with self.subTest('At root node, player 1 sells'):
             node = ('root')
             action = 1
             expected_result = ('root', 1)
-            self.assertEqual(self.game.take_action(node), expected_result)
+            self.assertEqual(self.game.take_action(node, action), expected_result)
 
         with self.subTest('player 1 sold, player 2 attempts to guess heads'):
             node = ('root', 0)
             action = 0
-            self.assertRaise(Exception, self.game.take_action, node, action,
+            self.assertRaises(Exception, self.game.take_action, node, action,
                              msg="Actions are not possible from this state. Exception was not thrown when it should have been.")
 
         with self.subTest('player 1 sold, player 2 attempts to guess tails'):
             node = ('root', 0)
             action = 1
-            self.assertRaise(Exception, self.game.take_action, node, action,
+            self.assertRaises(Exception, self.game.take_action, node, action,
                              msg="Actions are not possible from this state. Exception was not thrown when it should have been.")
 
         with self.subTest('Player 1 chose to bet, player 2 guesses heads'):
             node = ('root', 1)
             action = 0
             expected_result = ('root', 1, 0)
-            self.assertEqual(self.game.take_action(node), expected_result)
+            self.assertEqual(self.game.take_action(node, action), expected_result)
 
         with self.subTest('Player 1 chose to bet, player 2 guesses tails'):
             node = ('root', 1)
             action = 1
             expected_result = ('root', 1, 1)
-            self.assertEqual(self.game.take_action(node), expected_result)
+            self.assertEqual(self.game.take_action(node, action), expected_result)
 
         with self.subTest('player 2 guessed heads, player 1 attempts another action 0'):
             node = ('root', 1, 0)
             action = 0
-            self.assertRaise(Exception, self.game.take_action, node, action,
+            self.assertRaises(Exception, self.game.take_action, node, action,
                              msg="Actions are not possible from this state. Exception was not thrown when it should have been.")
 
         with self.subTest('player 2 guessed heads, player 1 attempts another action 1'):
             node = ('root', 1, 0)
             action = 1
-            self.assertRaise(Exception, self.game.take_action, node, action,
+            self.assertRaises(Exception, self.game.take_action, node, action,
                              msg="Actions are not possible from this state. Exception was not thrown when it should have been.")
 
         with self.subTest('Invalid action'):
             node = ('root', 0, 1)
             action = 2
-            self.assertRaises(self.game.take_action, node, action
+            self.assertRaises(Exception, self.game.take_action, node, action,
                               msg="An invalid action input did not result in a thrown exception when it should.")
 
         for bad_node in self.invalid_nodes:
             with self.subTest('Invalid node_name', bad_node=bad_node):
-                self.assertRaises(Exception, self.game.take_action, bad_node, 0
+                self.assertRaises(Exception, self.game.take_action, bad_node, 0,
                               msg="An invalid node_name input did not result in a thrown exception when it should.")
 
     def test_node_to_number(self):
         with self.subTest('Root node'):
             node = ('root')
             expected_result = 0
-            self.assertEqual(node, expected_result)
+            self.assertEqual(self.game.node_to_number(node), expected_result)
 
         with self.subTest('Player 1 sold'):
             node = ('root', 0)
             expected_result = 1
-            self.assertEqual(node, expected_result)
+            self.assertEqual(self.game.node_to_number(node), expected_result)
 
         with self.subTest('Player 1 decided to bet'):
             node = ('root', 1)
             expected_result = 2
-            self.assertEqual(node, expected_result)
+            self.assertEqual(self.game.node_to_number(node), expected_result)
 
         with self.subTest('Player 2 guessed heads'):
             node = ('root', 1, 0)
             expected_result = 3
-            self.assertEqual(node, expected_result)
+            self.assertEqual(self.game.node_to_number(node), expected_result)
 
         with self.subTest('Player 1 decided to bet'):
             node = ('root', 1, 1)
             expected_result = 4
-            self.assertEqual(node, expected_result)
+            self.assertEqual(self.game.node_to_number(node), expected_result)
 
         for bad_node in self.invalid_nodes:
             with self.subTest('Invalid node_name', bad_node=bad_node):
@@ -143,7 +142,7 @@ class TestCoinGame(unittest.TestCase):
 
 
     def test_get_rewards(self):
-        with self.subTest('P1 sells heads, plays tails; P2 always guesses heads')
+        with self.subTest('P1 sells heads, plays tails; P2 always guesses heads'):
             p1_strat = np.array([[1,0],
                                  [0,1]])
 
@@ -151,7 +150,7 @@ class TestCoinGame(unittest.TestCase):
                                  [0,0]])
             self.assertEqual(self.game.get_rewards(p1_strat, p2_strat), (0.75, -0.75))
 
-        with self.subTest('P1 sells heads, plays tails; P2 always guesses tails')
+        with self.subTest('P1 sells heads, plays tails; P2 always guesses tails'):
             p1_strat = np.array([[1,0],
                                  [0,1]])
 
@@ -159,7 +158,7 @@ class TestCoinGame(unittest.TestCase):
                                  [1,1]])
             self.assertEqual(self.game.get_rewards(p1_strat, p2_strat), (0.25, -0.25))
 
-        with self.subTest('P1 sells heads, plays tails; P2 guesses heads p=1/4, tails p=3/4)
+        with self.subTest('P1 sells heads, plays tails; P2 guesses heads p=1/4, tails p=3/4'):
             p1_strat = np.array([[1,0],
                                  [0,1]])
 
@@ -167,7 +166,7 @@ class TestCoinGame(unittest.TestCase):
                                  [0.75,0.75]])
             self.assertEqual(self.game.get_rewards(p1_strat, p2_strat), (0, 0))
 
-        with self.subTest('P1 always sells; P2 guesses heads p=1/4, tails p=3/4)
+        with self.subTest('P1 always sells; P2 guesses heads p=1/4, tails p=3/4'):
             p1_strat = np.array([[0,0],
                                  [1,1]])
 
@@ -238,7 +237,7 @@ class TestCoinGame(unittest.TestCase):
                 self.assertRaises(Exception, self.game.node_to_number, bad_node,
                               msg="An invalid node_name input did not result in a thrown exception when it should.")
 
-    @unittest.SkipTest('Not yet Implemented')
+    @unittest.skip('Not yet Implemented')
     def test_sample_history(self):
         raise NotImplementedError
 
