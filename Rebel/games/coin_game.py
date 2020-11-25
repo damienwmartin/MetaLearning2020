@@ -1,4 +1,4 @@
-from ..game_wrappers import game_wrapper
+from game_wrappers import game_wrapper
 import numpy as np
 
 
@@ -8,11 +8,21 @@ class CoinGame(game_wrapper):
         self.payoff_matrix_heads = np.array([[0.5, 0.5], [-1, 1]])
         self.payoff_matrix_tails = np.array([[-0.5, -0.5], [1, -1]])
 
+        self.num_hands = 2
+        self.num_actions = 2
+
     def get_legal_moves(self, node_name):
         if node_name == ('root', ) or node_name == ('root', 1):
             return [0, 1]
         else:
-            return None
+            return [None, None]
+    
+    def get_bid_ranges(self, node_name):
+        if node_name == ('root', ) or node_name == ('root', 1):
+            return (0, 2)
+        else:
+            return (2, 2)
+
     
     def take_action(self, node_name, action):
         if action in self.get_legal_moves(node_name):
@@ -33,6 +43,18 @@ class CoinGame(game_wrapper):
             return 4
         else:
             raise Exception("Argument node_name is invalid")
+    
+    def number_to_state(self, node_id):
+        if node_id == 0:
+            return ('root', 0)
+        elif node_id == 1:
+            return (0, 1)
+        elif node_id == 2:
+            return (1, 1)
+        elif node_id == 3:
+            return (0, 1)
+        elif node_id == 4:
+            return (1, 1)
     
     def get_rewards(self, strategy1, strategy2):
         """

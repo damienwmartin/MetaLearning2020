@@ -1,24 +1,23 @@
-from .Rebel_Alg import ReBeL
-from .games import CoinGame
+from Rebel_Alg import ReBeL
+from games.coin_game import CoinGame
+from games.liars_dice import LiarsDice
 import torch
 import torch.nn as nn
+from game_tree import recursive_game_tree, PBS
 
 
-def build_value_net(game)
+def build_value_net(game):
     """
-    Given the name of a game, builds an appropriate neural net that approximates the value of public belief states.
+    Given a game, builds an appropriate neural net that approximates the value of public belief states.
     """
-    if game == 'CoinGame':
-        return Net2()
-    elif game =='liarsdice':
-        return Net2()
+    if isinstance(game, CoinGame):
+        return Net2(n_in=8, n_out=2, n_hidden=4, n_layers=1)
+    elif isinstance(game, LiarsDice):
+        input_size = 2 + game.num_actions + 2*game.num_hands
+        return Net2(n_in=input_size, n_out=game.num_hands, n_hidden=256, n_layers=3)
     else:
         raise Exception("Game's value_net is not supported yet.")
     
-
-
-
-
 def build_mlp(
     *,
     n_in,
@@ -29,9 +28,9 @@ def build_mlp(
     use_layer_norm=False,
     dropout=0,
 ):
-"""
+    """
     Builds the body of the value net
-"""
+    """
 
     if act is None:
         act = GELU()
@@ -101,3 +100,9 @@ class Net2(nn.Module):
 class GELU(nn.Module):
     def forward(self, x):
         return nn.functional.gelu(x)
+
+
+pbs = PBS(('root', ), [[0.5, 0.5], [0.5, 0.5]])
+game = CoinGame()
+
+ReBeL(pbs, build_value_net(game), None, [], None, 100, game)

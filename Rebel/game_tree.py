@@ -176,7 +176,7 @@ class recursive_game_tree():
 		#return a new updated pbs after taking action
 		return(PBS(next_public_state, next_infostate_probs))
 	
-	def __len__():
+	def __len__(self):
 		return len(self.tree.nodes)
 	
 
