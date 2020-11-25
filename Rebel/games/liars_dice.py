@@ -92,8 +92,6 @@ class LiarsDice(game_wrapper):
             raise Exception("Action invalid")
         else:
             return (action, 1 - state.player)
-<<<<<<< HEAD
-
 
     def take_action(self, PBS, action):
         '''
@@ -105,13 +103,6 @@ class LiarsDice(game_wrapper):
         return action
 
         
-
-=======
-    
-    def take_action(self, node_name, state):
-        return node_name + (action, )
-    
->>>>>>> 0fd6b739b81a8f034a5709ae3cc1569e36dbcb25
     def iter_at_node(self, node_id):
         last_action = node_id[-1]
         for i in range(self.num_actions):
