@@ -26,7 +26,8 @@ class RPS():
 		return([0,1,2])
 
 	def get_rewards(self, PBS):
-		#Needs to take a terminal game state and return rewards for each player
+		#Needs to take a terminal game state and return rewards for every possible infostate
+		# size payout matrix (# of infostates for p1) * (# of infostates for p2)
 		payout_matrix = np.array([[1, 1, 1],
 								  [-1, -1, -1],
 								  [1, 1, 0]])
