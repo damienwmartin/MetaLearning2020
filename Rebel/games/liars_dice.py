@@ -1,4 +1,6 @@
 from game_wrappers import game_wrapper
+from game_tree import PBS
+import numpy as np
 # import LiarsDice_C from Modified C Code?
 
 class LiarsDice(game_wrapper):
@@ -77,11 +79,12 @@ class LiarsDice(game_wrapper):
         else:
             return (state[0] + 1, self.num_actions)
     
-    def is_terminal(self, state):
+    #Note changed this to run with PBS
+    def is_terminal(self, PBS):
         """
         Determines whether or not the state inputted is a terminal state
         """
-        return (state[0] == self.liar_call)
+        return (PBS.public == self.liar_call)
     
     def act(self, state, action):
         bid_range = self.get_bid_range(state)
@@ -89,7 +92,19 @@ class LiarsDice(game_wrapper):
             raise Exception("Action invalid")
         else:
             return (action, 1 - state.player)
-    
+
+
+    def take_action(self, PBS, action):
+        '''
+        Version of act taking in PBS
+        '''
+        bid_range = self.get_bid_range(PBS.public)
+        if (action < bid_range[0] or action >= bid_range[1]):
+            raise Exception("Action invalid")
+        return action
+
+        
+
     def iter_at_node(self, node_id):
         last_action = node_id[-1]
         for i in range(self.num_actions):
@@ -123,7 +138,7 @@ class LiarsDice(game_wrapper):
     
     #NOTE: Not constant, posibly mask the total range in game tree
     def get_legal_moves(self, PBS):
-        start, end = self.get_bid_range(PBS)
+        start, end = self.get_bid_range(PBS.public)
         return [i for i in range(start, end)]
 
     def sample_history(self, PBS, solver, random_action_prob, sampling_beliefs):
@@ -164,4 +179,9 @@ class LiarsDice(game_wrapper):
             normalize_beliefs_inplace(self.beliefs[state[1]])
     
         return path
-        
+
+    def get_init_PBS(self):
+        public_state = -1
+        player_turn = 0
+        infostate_probs = np.ones((2, self.num_faces**self.num_dice)) / (self.num_faces**self.num_dice)
+        return(PBS(public_state, infostate_probs))
