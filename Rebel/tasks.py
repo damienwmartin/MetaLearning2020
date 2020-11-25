@@ -1,6 +1,8 @@
 from Rebel_Alg import ReBeL
 from games.coin_game import CoinGame
 from games.liars_dice import LiarsDice
+from CFR import CFR
+import numpy as np
 import torch
 import torch.nn as nn
 from game_tree import recursive_game_tree, PBS
@@ -105,4 +107,12 @@ class GELU(nn.Module):
 pbs = PBS(('root', ), [[0.5, 0.5], [0.5, 0.5]])
 game = CoinGame()
 
-ReBeL(pbs, build_value_net(game), None, [], None, 100, game)
+
+
+G = recursive_game_tree(PBS, game)
+G.build_full_coin_game()
+beliefs = np.ones(game.num_hands) / game.num_hands
+params = {'dcfr': False, 'linear_update': False, 'num_iters': 100}
+agent = CFR(game, G, build_value_net(game), beliefs, params)
+
+agent.multistep()

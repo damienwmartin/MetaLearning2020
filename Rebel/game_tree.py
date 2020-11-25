@@ -47,7 +47,12 @@ class recursive_game_tree():
 			children = list(self.tree.successors(node_id))
 			for child in children:
 				self.build_depth_limited_subgame(depth_limit, child)
-
+	
+	def build_full_coin_game(self):
+		self.tree.add_node(('root', 0), depth=1, terminal=True, subgame_terminal=True)
+		self.tree.add_node(('root', 1), depth=1, terminal=False, subgame_terminal=False)
+		self.tree.add_node(('root', 1, 0), depth=2, terminal=True, subgame_terminal=True)
+		self.tree.add_node(('root', 1, 1), depth=2, terminal=True, subgame_terminal=True)
 
 
 

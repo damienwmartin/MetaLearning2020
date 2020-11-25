@@ -22,7 +22,6 @@ class CoinGame(game_wrapper):
             return (0, 2)
         else:
             return (2, 2)
-
     
     def take_action(self, node_name, action):
         if action in self.get_legal_moves(node_name):
@@ -117,3 +116,17 @@ class CoinGame(game_wrapper):
             normalize_beliefs_inplace(self.beliefs[state[1]])
     
         return path
+    
+    def iter_at_node(self, node_id):
+        """
+        Iterates through all possible action, child_node_id pairs for a particular node. Actions that are not possible at a node are still iterated through, but the child_node_id is None
+        """
+        if node_id == 0:
+            yield (0, 1)
+            yield (1, 2)
+        elif node_id == 2:
+            yield (0, 3)
+            yield (1, 4)
+        else:
+            yield (0, None)
+            yield (1, None)
