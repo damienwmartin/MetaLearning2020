@@ -142,16 +142,18 @@ class CFR(PartialTreeTraverser):
             if not public_node['subgame_terminal'] and not public_node['terminal']:
                 state = self.game.node_to_state(public_node_name)
                 start, end = self.game.get_bid_ranges(public_node_name)
-                value = np.zeros_like(self.traverser_values[public_node_id])
-                action_values = np.transpose(np.array([self.traverser_values[child_node_id] if child_node_id else [0]*game.num_hands for action, child_node_id in self.game.iter_at_node(public_node_id)]))
+                value = np.zeros_like(self.traverser_values[public_node_id]) # array of size (num_hands, )
+                action_values = np.transpose(np.array([self.traverser_values[child_node_id] if child_node_id else [0]*game.num_hands for action, child_node_id in self.game.iter_at_node(public_node_id)])) # array of size (num_hands, num_actions)
                 if state[1] == traverser:
-                    self.regrets[public_node_id] += np.transpose(action_values)
-                    value += np.sum(action_values * np.transpose(self.last_strategies[public_node_id]), axis=0)
-                    self.regrets[public_node_id] -= np.vstack([value if i >= start and i < end else 0 for i in range(self.game.num_actions)])
+                    self.regrets[public_node_id] += action_values
+                    # (num_hands, num_actions) -> (num_hands, num_actions)
+                    value += np.sum(action_values * self.last_strategies[public_node_id], axis=1)
+                    #(num_hands, )  [SUM 1](num_hands, num_actions)*(num_hands, num_actions)
+                    self.regrets[public_node_id] -= np.stack([value if i >= start and i < end else 0 for i in range(self.game.num_actions)], 1) #(num_hands, num_actions)
                     
                 else:
                     assert state[1] == 1 - traverser
-                    value += np.sum(action_values, axis=0)
+                    value += np.sum(action_values, axis=1)  # (num_hands) + [SUM 1] (num_hands, num_actions)
             
                 self.traverser_values[public_node_id] = value
                    
@@ -268,10 +270,10 @@ class CFR(PartialTreeTraverser):
     def multistep(self):
         for i in range(self.params['num_iters']):
             self.step(i % 2)
-            if i % 50 == 0:
+            if i % 10 == 0:
                 print('Iteration %d', i)
                 print("Player 1 strategy:", self.get_strategy()[0])
-                print("Player 2 strategy:", np.mean(self.get_strategy()[2], axis=0, keepdims=True))
+                print("Player 2 strategy:", self.get_strategy()[2])
     
     def update_value_network(self):
         self.add_training_example(0, self.get_hand_values(0))
