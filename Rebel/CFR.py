@@ -147,7 +147,7 @@ class CFR(PartialTreeTraverser):
                 if state[1] == traverser:
                     self.regrets[public_node_id] += np.transpose(action_values)
                     value += np.sum(action_values * np.transpose(self.last_strategies[public_node_id]), axis=0)
-                    self.regrets[public_node_id] -= np.vstack([value if i >= start and i < end else 0 for i in range(self.game.num_actions)]) # Change to 0 for invalid actions
+                    self.regrets[public_node_id] -= np.vstack([value if i >= start and i < end else 0 for i in range(self.game.num_actions)])
                     
                 else:
                     assert state[1] == 1 - traverser
@@ -229,8 +229,9 @@ class CFR(PartialTreeTraverser):
             state = self.game.node_to_state(node_name)
             node = self.tree.nodes[node_name]
             if state[1] == traverser and not node['terminal']:
+                start, end = self.game.get_bid_ranges(state)
                 node_id = self.game.node_to_number(node_name)
-                self.last_strategies[node_id] = np.maximum(self.regrets[node_id], EPSILON)
+                self.last_strategies[node_id] = np.maximum(self.regrets[node_id], np.array([EPSILON if i >= start and i < end else 0 for i in range(self.game.num_actions)]))
                 for hand in range(self.game.num_hands):
                     self.last_strategies[node_id][hand] = normalize_probabilities_safe(self.last_strategies[node_id][hand])
 
@@ -266,9 +267,11 @@ class CFR(PartialTreeTraverser):
     
     def multistep(self):
         for i in range(self.params['num_iters']):
-            print('Iteration %d', i)
             self.step(i % 2)
-            print("strategy", self.get_strategy())
+            if i % 10 == 0:
+                print('Iteration %d', i)
+                print("Player 1 strategy:", self.get_strategy()[0])
+                print("Player 2 strategy:", self.get_strategy()[2])
     
     def update_value_network(self):
         self.add_training_example(0, self.get_hand_values(0))
