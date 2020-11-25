@@ -85,7 +85,7 @@ def build_solver(game, root, beliefs, params, net):
 def compute_exploitability2(game, strategy):
     root = game.get_initial_state()
     tree = unroll_tree(game, root, 1000000)
-    beliefs = ([1/game.num_hands() for i in range(game.num_hands())], [1/game.num_hands() for i in range(game.num_hands())])
+    beliefs = ([1/game.num_hands for i in range(game.num_hands)], [1/game.num_hands for i in range(game.num_hands)])
     solver = BRSolver(game, tree, None)
     values0 = solver.compute_br(0, strategy, beliefs)
     values1 = solver.compute_br(1, strategy, beliefs)
@@ -106,6 +106,11 @@ def compute_strategy_stats(game, strategy):
     #TODO: Finish this function!
 
 def compute_ev(game, strategy1, strategy2):
+    """
+    strategies are nodes by hands by action
+    Expected value with respect to the player with strategy1
+    Returns expected value for each hand
+    """
     tree = unroll_tree(game)
     op_reach_probabilities = [[0 for i in range(game.num_hands())] for j in range(len(tree))]
     values = [[] for i in range(len(tree))]

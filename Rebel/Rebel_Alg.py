@@ -1,8 +1,8 @@
 #psuedocode for the rebel overall rebel algorithm
 
 import numpy as np
-from game_tree import game_tree
-from .CFR import CFR
+from game_tree import recursive_game_tree
+from CFR import CFR
 
 '''
 Undefined functions in here
@@ -21,12 +21,17 @@ Subgame (G) - Depth limited tree of game states
 
 
 def ReBeL(PBS, v_net, p_net, D_v, D_p, T, game_wrapper):
-	while not PBS.is_terminal:
+	"""
+	The main ReBeL algorithm
+	"""
+	G = recursive_game_tree(PBS, game_wrapper)
+	beliefs = np.ones(game_wrapper.num_hands) / game_wrapper.num_hands
+	params = {'dcfr': False, 'linear_update': False}
+	agent = CFR(game_wrapper, G, v_net, beliefs, params)
+	#while not PBS.is_terminal:
+	for i in range(2):
 		#Build game tree going forward n actions from start node
-		G = game_tree(game_wrapper)
-		beliefs = np.ones(game_wrapper.num_hands) / game_wrapper.num_hands
-		agent = CFR(game_wrapper, game_tree, v_net, beliefs, params)
-		G.construct_subgame(PBS)
+		G.build_depth_limited_subgame(PBS)
 
 		#initialize policy using the policy network
 		pi_bar, pi_t = init_policy(G, p_net)
