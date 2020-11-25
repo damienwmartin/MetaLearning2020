@@ -112,7 +112,7 @@ game = CoinGame()
 G = recursive_game_tree(PBS, game)
 G.build_full_coin_game()
 beliefs = np.ones(game.num_hands) / game.num_hands
-params = {'dcfr': False, 'linear_update': False, 'num_iters': 100}
+params = {'dcfr': False, 'linear_update': False, 'num_iters': 1000}
 agent = CFR(game, G, build_value_net(game), beliefs, params)
 
 agent.multistep()

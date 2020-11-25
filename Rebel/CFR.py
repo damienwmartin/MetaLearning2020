@@ -126,8 +126,8 @@ class CFR(PartialTreeTraverser):
         self.regrets = np.zeros((len(tree), game.num_hands, game.num_actions))
         self.reach_probabilities_buffer = np.zeros((len(tree), game.num_hands))
 
-        self.root_values = [None, None]
-        self.root_values_means = [None, None]
+        self.root_values = [[], []]
+        self.root_values_means = [[], []]
     
     def update_regrets(self, traverser):
         """
@@ -151,7 +151,7 @@ class CFR(PartialTreeTraverser):
                     
                 else:
                     assert state[1] == 1 - traverser
-                    value += action_values
+                    value += np.sum(action_values, axis=0)
             
                 self.traverser_values[public_node_id] = value
                    
@@ -190,7 +190,7 @@ class CFR(PartialTreeTraverser):
 
         # Updates the average using a factor of alpha, which depends on if we use LCFR or normal CFR
         alpha = 2 /(self.num_steps[traverser] + 2) if self.params['linear_update'] else 1 / (self.num_steps[traverser] + 1)
-        self.root_values_means[traverser] = resize(self.root_values_means(traverser), len(self.root_values[traverser]))
+        self.root_values_means[traverser] = resize(self.root_values_means[traverser], len(self.root_values[traverser]))
 
         self.root_values_means[traverser] += alpha*(self.root_values[traverser] - self.root_values_means[traverser])
 
@@ -230,7 +230,7 @@ class CFR(PartialTreeTraverser):
             node = self.tree.nodes[node_name]
             if state[1] == traverser and not node['terminal']:
                 node_id = self.game.node_to_number(node_name)
-                self.last_strategies[node_id] = np.max(regrets[node_id], EPSILON)
+                self.last_strategies[node_id] = np.maximum(self.regrets[node_id], EPSILON)
                 for hand in range(self.game.num_hands):
                     self.last_strategies[node_id][hand] = normalize_probabilities_safe(self.last_strategies[node_id][hand])
 
@@ -255,9 +255,9 @@ class CFR(PartialTreeTraverser):
                 node_id = self.game.node_to_number(node_name)
                 start, end = self.game.get_bid_ranges(state)
                 self.sum_strategies[node_id] *= strat_discount
-                self.sum_strategies[node_id] += np.vstack([self.reach_probabilities_buffer[node_id]]*game.num_actions, 1)*self.last_strategies[node_id]
+                self.sum_strategies[node_id] += np.vstack([self.reach_probabilities_buffer[node_id]]*self.game.num_actions)*self.last_strategies[node_id]
                 for hand in range(self.game.num_hands):
-                    if params['dcfr'] or params['linear_update']:
+                    if self.params['dcfr'] or self.params['linear_update']:
                         for action in range(start, end):
                             self.regrets[node_id][hand][action] *= (pos_discount if self.regrets[node_id][hand][action] > 0 else neg_discount)
                     self.average_strategies[node_id][hand] = normalize_probabilities_safe(self.sum_strategies[node_id][hand])
@@ -268,6 +268,7 @@ class CFR(PartialTreeTraverser):
         for i in range(self.params['num_iters']):
             print('Iteration %d', i)
             self.step(i % 2)
+            print("strategy", self.get_strategy())
     
     def update_value_network(self):
         self.add_training_example(0, self.get_hand_values(0))
@@ -397,3 +398,21 @@ def get_uniform_strategy(game, tree):
         strategy[node_id] = np.array([[1/(end - start) if j >= start and j < end else 0 for j in range(game.num_actions)] for i in range(game.num_hands)])
     
     return strategy
+
+
+def resize(x, size):
+    """
+    Python implementation of the C++ standard .resize() operation
+    """
+    N = len(x)
+    if size > N:
+        y = x[:]
+        y.extend([0]*(size - N))
+        return y
+    else:
+        return x[:size]
+
+def normalize_probabilities_safe(x, epsilon=1e-200):
+    
+    total = sum(x) + len(x)*epsilon
+    return [(x_i + epsilon)/total for x_i in x]
