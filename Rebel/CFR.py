@@ -66,27 +66,31 @@ class PartialTreeTraverser:
         self.precompute_terminal_leaves_values(traverser)
 
     def precompute_terminal_leaves_values(self, traverser):
+        """
+        Computes the value of each terminal node
+        """
 
         if isinstance(self.game, CoinGame):
-            inv = 1 - (2*traverser)
-            for node_name in self.terminal_indices:
-                node_id = self.game.node_to_number(node_name)
-                if node_name == ('root', 0):
-                    self.traverser_values[node_id] = inv*np.array([0.5, -0.5])
-                elif node_name == ('root', 0, 1):
-                    self.traverser_values[node_id] = inv*np.array([-1, 1])
-                elif node_name == ('root', 1, 1):
-                    self.traverser_values[node_id] = inv*np.array([1, -1])
-        
-        elif isinstance(self.game, LiarsDice):
+            if traverser:
+                # Beliefs of H vs T for the person selling
+
+                for node_id in [1, 3, 4]:
+                    beliefs = normalize_probabilities_safe(self.reach_probabilities[0][node_id]) # Array of [P(heads), P(tails)]?
+
+                    # Calculate EV
+
+                    # Use beliefs for traverser 2
+            else:
+                self.traverser_values[1] = np.array([0.5, -0.5])
+                self.traverser_values[3] = np.array([-1, 1])
+                self.traverser_values[4] = np.array([1, -1])
+
+        if isinstance(self.game, LiarsDice):
             for node_name in self.terminal_indices:
                 last_bid = self.game.node_to_state(node_name[:-1])[0]
                 node_id = self.game.node_to_number(node_name)
                 self.traverser_values[node_id] = compute_expected_terminal_values(self.game, last_bid, self.game.node_to_state(node_name)[1] != traverser, self.reach_probabilities[1 - traverser][node_id])
-        
-        else:
-            raise Exception("Game not supported yet.")
-    
+
     def query_value_net(self, traverser):
         if self.pseudo_leaves_indices != []:
             N = len(self.pseudo_leaves_indices)
@@ -374,15 +378,18 @@ def get_uniform_reach_weighted_strategy(game, tree, initial_beliefs):
 
 def compute_expected_terminal_values(game, last_bid, inverse, op_reach_probabilities):
     """
-    Computes the 
+    Computes the expected terminal values for each node, for each hand
+
+    op_reach_probabilities -> input from precompute_terminal_leaf values was probability of reaching the node for each hand
     """
     inv = 2*int(inverse) - 1
     values = self.game.compute_win_probability(last_bid, op_reach_probabilities)
     belief_sum = sum(op_reach_probabilities)
 
+    # Normalize values based on the sum of op_reach_probabilities
     for i in range(len(values)):
         values[i] = (2*values[i] - belief_sum)*inv
-    
+        
     return values
 
 

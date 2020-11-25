@@ -130,3 +130,19 @@ class CoinGame(game_wrapper):
         else:
             yield (0, None)
             yield (1, None)
+    
+    def compute_win_probability(self, node_name, beliefs)
+        """
+        Given the probability that nodes are reached, computes the probability that the traverser wins
+        """
+
+        if node_name == ('root', 0):
+            return 0
+        elif node_name == ('root', 1, 0):
+            return 0
+        elif node_name == ('root', 1, 1):
+            return 0
+        else:
+            raise Exception("The node entered is not a terminal node of the Coin Game.")
+
+        
