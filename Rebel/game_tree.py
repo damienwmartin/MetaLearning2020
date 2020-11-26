@@ -66,7 +66,7 @@ class recursive_game_tree():
 
 		if node['terminal']:
 			payout_matrix = self.game.get_rewards(pbs)
-			reward = np.dot(payout_matrix, pbs.infostate_matrix())
+			reward = np.dot(payout_matrix.T, pbs.infostate_matrix())
 			
 			if verbose:
 				print(f"setting value for {node_id}")
@@ -86,7 +86,7 @@ class recursive_game_tree():
 				self.set_leaf_values(value_net, (*node_id,action))
 
 
-	def compute_ev(self, node_id = ('root',)):
+	def compute_ev(self, node_id = ('root',), verbose = True):
 		node = self.tree.nodes[node_id]
 		
 		if node['subgame_terminal'] or node['terminal']:
@@ -95,8 +95,18 @@ class recursive_game_tree():
 		else:
 			node['value']=0
 			for action in self.game.get_legal_moves(node['PBS']):
-				node['value'] = node['value'] + node['policy'][:,action]*self.compute_ev((*node_id,action))
+				next_state_ev = self.compute_ev((*node_id,action))
+				node['value'] = node['value'] + sum(node['policy'][:,action]) * next_state_ev
+				if verbose:
+					print(f"Adding value to {node_id} for {action}")
+					print('p(next_state) * next_state(value)  = x')
+					print(sum(node['policy'][:,action]), ' * ', next_state_ev, ' = ', sum(node['policy'][:,action]) * next_state_ev)
 			return(node['value'])
+
+	def update_policy(self):
+		#cfr going in here
+		pass
+
 
 	def sample_leaf(self):
 		node_id = ('root',)
