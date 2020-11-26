@@ -148,7 +148,7 @@ class CoinGame(game_wrapper):
         else:
             yield (0, None)
             yield (1, None)
-    
+   
     def compute_win_probability(self, node_name, beliefs):
         """
         Given the probability that nodes are reached, computes the probability that the traverser wins
