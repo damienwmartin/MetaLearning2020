@@ -70,10 +70,12 @@ class LiarsDice(game_wrapper):
         """
         return (self.K_INITIAL_ACTION, 0)
     
-    def get_bid_range(self, state):
+    def get_bid_range(self, node_name):
         """
         Returns a tuple (start, end) which represent all possible legal actions that can be taken from that state
         """
+
+        state = self.node_to_state(node_name)
         if state[0] == self.K_INITIAL_ACTION:
             return (0, self.num_actions - 1)
         else:

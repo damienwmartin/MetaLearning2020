@@ -66,27 +66,31 @@ class PartialTreeTraverser:
         self.precompute_terminal_leaves_values(traverser)
 
     def precompute_terminal_leaves_values(self, traverser):
+        """
+        Computes the value of each terminal node
+        """
 
         if isinstance(self.game, CoinGame):
-            inv = 1 - (2*traverser)
-            for node_name in self.terminal_indices:
-                node_id = self.game.node_to_number(node_name)
-                if node_name == ('root', 0):
-                    self.traverser_values[node_id] = inv*np.array([0.5, -0.5])
-                elif node_name == ('root', 0, 1):
-                    self.traverser_values[node_id] = inv*np.array([-1, 1])
-                elif node_name == ('root', 1, 1):
-                    self.traverser_values[node_id] = inv*np.array([1, -1])
-        
-        elif isinstance(self.game, LiarsDice):
+            if traverser:
+                # Beliefs of H vs T for the person selling
+
+                for node_id in [1, 3, 4]:
+                    beliefs = normalize_probabilities_safe(self.reach_probabilities[0][node_id]) # Array of [P(heads), P(tails)]?
+
+                    # Calculate EV
+
+                    # Use beliefs for traverser 2
+            else:
+                self.traverser_values[1] = np.array([0.5, -0.5])
+                self.traverser_values[3] = np.array([-1, 1])
+                self.traverser_values[4] = np.array([1, -1])
+
+        if isinstance(self.game, LiarsDice):
             for node_name in self.terminal_indices:
                 last_bid = self.game.node_to_state(node_name[:-1])[0]
                 node_id = self.game.node_to_number(node_name)
                 self.traverser_values[node_id] = compute_expected_terminal_values(self.game, last_bid, self.game.node_to_state(node_name)[1] != traverser, self.reach_probabilities[1 - traverser][node_id])
-        
-        else:
-            raise Exception("Game not supported yet.")
-    
+
     def query_value_net(self, traverser):
         if self.pseudo_leaves_indices != []:
             N = len(self.pseudo_leaves_indices)
@@ -141,17 +145,19 @@ class CFR(PartialTreeTraverser):
             public_node_id = self.game.node_to_number(public_node_name)
             if not public_node['subgame_terminal'] and not public_node['terminal']:
                 state = self.game.node_to_state(public_node_name)
-                start, end = self.game.get_bid_ranges(state)
-                value = np.zeros_like(self.traverser_values[public_node_id])
-                action_values = np.transpose(np.array([self.traverser_values[child_node_id] if child_node_id else [0]*game.num_hands for action, child_node_id in self.game.iter_at_node(public_node_id)]))
+                start, end = self.game.get_bid_ranges(public_node_name)
+                value = np.zeros_like(self.traverser_values[public_node_id]) # array of size (num_hands, )
+                action_values = np.transpose(np.array([self.traverser_values[child_node_id] if child_node_id else [0]*game.num_hands for action, child_node_id in self.game.iter_at_node(public_node_id)])) # array of size (num_hands, num_actions)
                 if state[1] == traverser:
-                    self.regrets[public_node_id] += np.transpose(action_values)
-                    value += np.sum(action_values * np.transpose(self.last_strategies[public_node_id]), axis=0)
-                    self.regrets[public_node_id] -= np.vstack([value if i >= start and i < end else 0 for i in range(self.game.num_actions)])
+                    self.regrets[public_node_id] += action_values
+                    # (num_hands, num_actions) -> (num_hands, num_actions)
+                    value += np.sum(action_values * self.last_strategies[public_node_id], axis=1)
+                    #(num_hands, )  [SUM 1](num_hands, num_actions)*(num_hands, num_actions)
+                    self.regrets[public_node_id] -= np.stack([value if i >= start and i < end else 0 for i in range(self.game.num_actions)], 1) #(num_hands, num_actions)
                     
                 else:
                     assert state[1] == 1 - traverser
-                    value += np.sum(action_values, axis=0)
+                    value += np.sum(action_values, axis=1)  # (num_hands) + [SUM 1] (num_hands, num_actions)
             
                 self.traverser_values[public_node_id] = value
                    
@@ -229,7 +235,7 @@ class CFR(PartialTreeTraverser):
             state = self.game.node_to_state(node_name)
             node = self.tree.nodes[node_name]
             if state[1] == traverser and not node['terminal']:
-                start, end = self.game.get_bid_ranges(state)
+                start, end = self.game.get_bid_ranges(node_name)
                 node_id = self.game.node_to_number(node_name)
                 self.last_strategies[node_id] = np.maximum(self.regrets[node_id], np.array([EPSILON if i >= start and i < end else 0 for i in range(self.game.num_actions)]))
                 for hand in range(self.game.num_hands):
@@ -254,7 +260,7 @@ class CFR(PartialTreeTraverser):
             state = self.game.node_to_state(node_name)
             if state[1] == traverser and not node['terminal']:
                 node_id = self.game.node_to_number(node_name)
-                start, end = self.game.get_bid_ranges(state)
+                start, end = self.game.get_bid_ranges(node_name)
                 self.sum_strategies[node_id] *= strat_discount
                 self.sum_strategies[node_id] += np.vstack([self.reach_probabilities_buffer[node_id]]*self.game.num_actions)*self.last_strategies[node_id]
                 for hand in range(self.game.num_hands):
@@ -361,7 +367,7 @@ def get_uniform_reach_weighted_strategy(game, tree, initial_beliefs):
         """
         for node in range(len(tree)):
             if tree[node].num_children() and tree_node.state.player_id == traverser:
-                action_begin, action_end = game.get_bid_range(tree[node].state)
+                action_begin, action_end = game.get_bid_ranges(tree[node].state)
                 for hand in range(game.num_hands()):
                     for action in range(action_begin, action_end):
                         strategy[node][hand][action] *= reach_probabilities_buffer[node][hand]
@@ -372,15 +378,18 @@ def get_uniform_reach_weighted_strategy(game, tree, initial_beliefs):
 
 def compute_expected_terminal_values(game, last_bid, inverse, op_reach_probabilities):
     """
-    Computes the 
+    Computes the expected terminal values for each node, for each hand
+
+    op_reach_probabilities -> input from precompute_terminal_leaf values was probability of reaching the node for each hand
     """
     inv = 2*int(inverse) - 1
     values = self.game.compute_win_probability(last_bid, op_reach_probabilities)
     belief_sum = sum(op_reach_probabilities)
 
+    # Normalize values based on the sum of op_reach_probabilities
     for i in range(len(values)):
         values[i] = (2*values[i] - belief_sum)*inv
-    
+        
     return values
 
 
@@ -395,9 +404,8 @@ def get_uniform_strategy(game, tree):
 
     strategy = np.zeros((len(tree), game.num_hands, game.num_actions))
     for node_name in tree.nodes:
-        state = game.node_to_state(node_name)
         node_id = game.node_to_number(node_name)
-        start, end = game.get_bid_ranges(state)
+        start, end = game.get_bid_ranges(node_name)
         strategy[node_id] = np.array([[1/(end - start) if j >= start and j < end else 0 for j in range(game.num_actions)] for i in range(game.num_hands)])
     
     return strategy
