@@ -35,8 +35,11 @@ class recursive_game_tree():
 		Mark nodes which are subgame terminal
 		'''
 		node = self.tree.nodes[node_id]
+		pbs = node['PBS']
+		num_actions = self.game.num_actions
+		num_infostates = pbs.num_infostates()
 		#initialize uniform_policy
-		node['policy'] = np.ones(self.game.num_actions)/self.game.num_actions
+		node['policy'] = np.ones((num_infostates, num_actions))/num_actions
 		node['subgame_terminal'] = False
 		if node['depth'] == depth_limit:
 			node['subgame_terminal'] = True
@@ -48,6 +51,7 @@ class recursive_game_tree():
 			for child in children:
 				self.build_depth_limited_subgame(depth_limit, child)
 	
+
 	def build_full_coin_game(self):
 		self.tree.add_node(('root', 0), depth=1, terminal=True, subgame_terminal=True)
 		self.tree.add_node(('root', 1), depth=1, terminal=False, subgame_terminal=False)
@@ -55,42 +59,34 @@ class recursive_game_tree():
 		self.tree.add_node(('root', 1, 1), depth=2, terminal=True, subgame_terminal=True)
 
 
-
-
-#NOTE: Moved into build subgame
-#	def initialize_random_policy(self):
-		'''
-		Run through the tree and set all node policies to be uniform over available actions
-		Policy is (actions x infostates)
-		'''
-#		for node_id, attributes in G.nodes.data():
-#			actions = self.game.get_legal_moves(attributes['PBS'])
-#			policy = {action:np.ones(self.game.num_infostates)/len(actions)}
-
-	def set_leaf_values(self, value_net, node_id=('root',)):
+	def set_leaf_values(self, value_net, node_id=('root',), verbose = True):
 		#TODO: This is incomplete
 		node = self.tree.nodes[node_id] 
-		print(node_id)
-		
+		pbs = node['PBS']
 
 		if node['terminal']:
-			print('setting terminal')
-			node['value'] = self.game.get_rewards(node['PBS'])
+			payout_matrix = self.game.get_rewards(pbs)
+			reward = np.dot(payout_matrix.T, pbs.infostate_matrix())
+			
+			if verbose:
+				print(f"setting value for {node_id}")
+				print('infostate_matrix * payout_matrix  = x')
+				print(pbs.infostate_matrix(), ' * ', payout_matrix, ' = ', reward)
+			node['value'] = reward
 
 		#Estimate values for nodes terminal in the subgame
 		elif node['subgame_terminal']:
-			print('setting subgame_terminal')
 			node['value'] = value_net(node['PBS'].vector())
 
 		#Otherwise recursively rebuild the tree
-		
+			
 		else:
 			for action in self.game.get_legal_moves(node['PBS']):
 				self.add_child(node_id, action)
 				self.set_leaf_values(value_net, (*node_id,action))
 
 
-	def compute_ev(self, node_id = ('root',)):
+	def compute_ev(self, node_id = ('root',), verbose = True):
 		node = self.tree.nodes[node_id]
 		
 		if node['subgame_terminal'] or node['terminal']:
@@ -98,9 +94,19 @@ class recursive_game_tree():
 
 		else:
 			node['value']=0
-			for action in self.game.get_legal_moves(['PBS']):
-				node['value'] = node['value'] + node['policy'][action]*self.compute_ev((*node_id,action))
+			for action in self.game.get_legal_moves(node['PBS']):
+				next_state_ev = self.compute_ev((*node_id,action))
+				node['value'] = node['value'] + sum(node['policy'][:,action]) * next_state_ev
+				if verbose:
+					print(f"Adding value to {node_id} for {action}")
+					print('p(next_state) * next_state(value)  = x')
+					print(sum(node['policy'][:,action]), ' * ', next_state_ev, ' = ', sum(node['policy'][:,action]) * next_state_ev)
 			return(node['value'])
+
+	def update_policy(self):
+		#cfr going in here
+		pass
+
 
 	def sample_leaf(self):
 		node_id = ('root',)
@@ -165,7 +171,7 @@ class recursive_game_tree():
 			value = np.multiply(self.game.get_rewards(new_pbs), new_pbs.infostate_matrix()).sum().sum()
 
 		self.tree.add_node(new_node_id, depth = new_depth, PBS = new_pbs, terminal=terminal)
-		self.tree.add_edge(node_id, new_node_id, action=action, weight=node['policy'][action])
+		self.tree.add_edge(node_id, new_node_id, action=action, weight=sum(node['policy'][:,action]))
 
 
 	def transition(self, pbs, action, policy = None):
@@ -178,8 +184,11 @@ class recursive_game_tree():
 		#Get the next distribution of infostates if policy exists
 		next_infostate_probs = pbs.update_infostate_probs(policy, action)
 
+		#Get the next player
+		player_number = 1 - pbs.player_turn
+
 		#return a new updated pbs after taking action
-		return(PBS(next_public_state, next_infostate_probs))
+		return(PBS(next_public_state, next_infostate_probs, player_number))
 	
 	def __len__(self):
 		return len(self.tree.nodes)
@@ -193,14 +202,20 @@ class PBS():
 	For liars dice public is players turn, last bid, and probability distribution of each players hands
 	TODO:Pull player number out into its own variable
 	'''
-	def __init__(self, public_state, infostate_probs):
-		self.player_turn = 0
+	def __init__(self, public_state, infostate_probs, player = 0):
+		self.player_turn = player
 		#representation of public state for the game
 		self.public = public_state
 		#list of probability matrices for each players infostate, (# players, infostate size)
 		self.infostate_probs = infostate_probs 		
 		
-	def update_infostate_probs(self, policy, action):
+	def num_infostates(self):
+		'''
+		for just the current player
+		'''
+		return(len(self.infostate_probs[self.player_turn]))
+
+	def update_infostate_probs(self, policy, action, verbose = True):
 		'''
 		policy is for the state - size (# infostates, actions)
 		beyes update infostate posterior(state) ~ prior(state)*p(a|state)
@@ -208,9 +223,14 @@ class PBS():
 		player_number is whose beliefs you're updating
 
 		'''
-		player_number = self.public[0]
+		player_number = self.player_turn
 		new_infostate_probs = self.infostate_probs.copy()
-		new_infostate_probs[player_number] = self.infostate_probs[player_number] * policy[action]/sum(self.infostate_probs[player_number] * policy[action])
+
+		if verbose:
+			print('new_infostate_probs = infostate_probs[player_number] * policy[:,action]')
+
+		posterior = self.infostate_probs[player_number] * policy[:,action]
+		new_infostate_probs[player_number] = posterior/sum(posterior)
 		return(new_infostate_probs)
 
 	def infostate_matrix(self):
