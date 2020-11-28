@@ -259,4 +259,4 @@ class PBS():
 		'''
 		Numpy array representation -> input into value/policy net
 		'''
-		return(np.concat([self.public_state, *self.infostate_probs]))
+		return(np.concatenate([[self.player_turn], [self.public], *self.infostate_probs]))
