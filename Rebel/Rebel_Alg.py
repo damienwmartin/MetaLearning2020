@@ -20,7 +20,7 @@ Subgame (G) - Depth limited tree of game states
  '''
 
 
-def ReBeL(PBS, v_net, p_net, D_v, D_p, T, game_wrapper):
+def ReBeL(PBS, game_wrapper, v_net, T=1000, p_net=None):
 	"""
 	The main ReBeL algorithm
 	"""
@@ -29,8 +29,8 @@ def ReBeL(PBS, v_net, p_net, D_v, D_p, T, game_wrapper):
 	params = {'dcfr': False, 'linear_update': False}
 	agent = CFR(game_wrapper, G, v_net, beliefs, params)
 	D_v = [] #Training data for the value net
-	#while not PBS.is_terminal:
-	for i in range(2):
+	while not PBS.is_terminal:
+	#for i in range(2):
 		#Build game tree going forward n actions from start node initializes random policy
 		G.build_depth_limited_subgame(PBS)
 
@@ -74,12 +74,14 @@ def ReBeL(PBS, v_net, p_net, D_v, D_p, T, game_wrapper):
 				next_PBS = G.sample_leaf() 
 
 		#Add trainging data for value and policy net
-		D_v.append(tuple(PBS.vector, EV_PBS))
+		D_v.append(tuple(PBS.vector(), EV_PBS))
 
 		#Note: No policy net
 		#for node in G:
 		#	D_p.append(tuple(node, pi_bar.get_policy(node)))
 
 		PBS = next_PBS
+
+	return(D_v)
 
 
