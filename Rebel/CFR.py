@@ -75,7 +75,7 @@ class PartialTreeTraverser:
 
     def precompute_terminal_leaves_values(self, traverser):
         """
-        Computes the value of each terminal node
+        Computes the expected value of each terminal node, according to the traverser
         """
 
         if isinstance(self.game, CoinGame):
@@ -122,6 +122,9 @@ class PartialTreeTraverser:
     
 
     def populate_leaf_values(self):
+        """
+        Gets the leaf values that are not actual leaves, and reads the torch tensor from the value net result
+        """
         if self.pseudo_leaves_indices != []:
             result_acc = self.leaf_values.cpu().numpy()
             for row in range(len(self.pseudo_leaves_indices)):
@@ -133,6 +136,8 @@ class PartialTreeTraverser:
 class CFR(PartialTreeTraverser):
     """
     Implementation of CFR that was directly translated from the ReBeL repo
+
+    Note: will change all instances of self.game.get_bid_ranges() to self.game.get_legal_moves() soon
     """
 
     def __init__(self, game, tree, value_net, beliefs, params):
@@ -154,8 +159,8 @@ class CFR(PartialTreeTraverser):
         """
         Computes the regrets associated with a traverser and stores the result in self.regrets
         """
-        self.precompute_all_reaches(self.last_strategies, self.initial_beliefs)
-        self.precompute_all_leaf_values(traverser)
+        self.precompute_all_reaches(self.last_strategies, self.initial_beliefs) # Computes the probability that a certain node is reached
+        self.precompute_all_leaf_values(traverser) # Computes the expected value for all leaf nodes
 
         for public_node_name in reversed(list(self.tree.nodes)):
             public_node = self.tree.nodes[public_node_name]
@@ -163,19 +168,20 @@ class CFR(PartialTreeTraverser):
             if not public_node['subgame_terminal'] and not public_node['terminal']:
                 state = self.game.node_to_state(public_node_name)
                 start, end = self.game.get_bid_ranges(public_node_name)
-                value = np.zeros_like(self.traverser_values[public_node_id]) # array of size (num_hands, )
+                value = np.zeros_like(self.traverser_values[public_node_id]) # Will store the value of the strategy for each hand
                 if state[1] == traverser:
                     for action in range(start, end):
                         child_node_id = self.game.node_to_number(public_node_name + (action, ))
-                        self.regrets[public_node_id, :, action] += self.traverser_values[child_node_id] # array of size (num_hands, )
-                        value += self.traverser_values[child_node_id] * self.last_strategies[public_node_id, :, action] # array of size (num_hands, )
+                        self.regrets[public_node_id, :, action] += self.traverser_values[child_node_id] # Utility of the action
+                        value += self.traverser_values[child_node_id] * self.last_strategies[public_node_id, :, action] # Adds the contribution of the action to the current value. This value is basically  SUM(P(a)*v(a)) for actions a, where P(a) is the probability and v(a) is the value.
                         
                     for action in range(start, end):
-                        self.regrets[public_node_id, :, action] -= value # array of size (num_hands, )
+                        self.regrets[public_node_id, :, action] -= value # subtract the current strategy value from the regrets
                 else:
+                    # In this case, the traverser is not the player at this node, so there are no regrets to worry about
                     for action in range(start, end):
                         child_node_id = self.game.node_to_number(public_node_name + (action, ))
-                        value += self.traverser_values[child_node_id]*self.last_strategies[public_node_id, :, action]
+                        value += self.traverser_values[child_node_id]*self.last_strategies[public_node_id, :, action] # In the original code, there was no multiplication by self.last_strategies, but including it made this work for the Coin Game
             
                 self.traverser_values[public_node_id] = value
     
@@ -183,15 +189,17 @@ class CFR(PartialTreeTraverser):
         """
         Does a step of the CFR algorithm, and updates the average policies
         """
-        self.update_regrets(traverser, i)
-        self.root_values[traverser] = self.traverser_values[0]
+        self.update_regrets(traverser, i) # Computes the regrets associated with the current strategy
+        self.root_values[traverser] = self.traverser_values[0] # Sets the ev of the root node (and thus of the strategy)
 
         # Updates the average using a factor of alpha, which depends on if we use LCFR or normal CFR
         alpha = 2 /(self.num_steps[traverser] + 2) if self.params['linear_update'] else 1 / (self.num_steps[traverser] + 1)
+        
         self.root_values_means[traverser] = resize(self.root_values_means[traverser], len(self.root_values[traverser]))
-
         self.root_values_means[traverser] += alpha*(self.root_values[traverser] - self.root_values_means[traverser])
 
+
+        ### This section is relevant only if you use Linear CFR or CFR-D ###
         pos_discount = 1
         neg_discount = 1
         strat_discount = 1
@@ -207,36 +215,45 @@ class CFR(PartialTreeTraverser):
             if self.params['dcfr_beta'] > -5:
                 neg_discount = num_strategies**self.params['dcfr_beta'] / (num_strategies**self.params['dcfr_beta'] + 1)
             strat_discount = (num_strategies / (num_strategies + 1))**self.params['dcfr_gamma']
+        ### End irrelevant section ###
     
-
+        # Blackwell's Regret-Matching Algorithm
         for node_name in self.tree.nodes:
             state = self.game.node_to_state(node_name)
             node = self.tree.nodes[node_name]
             if state[1] == traverser and not node['terminal']:
                 start, end = self.game.get_bid_ranges(node_name)
                 node_id = self.game.node_to_number(node_name)
-                self.last_strategies[node_id] = np.maximum(self.regrets[node_id], np.array([EPSILON if i >= start and i < end else 0 for i in range(self.game.num_actions)]))
-                self.last_strategies[node_id] /= np.sum(self.last_strategies[node_id], axis=1, keepdims=True)
+                self.last_strategies[node_id] = np.maximum(self.regrets[node_id], np.array([EPSILON if i >= start and i < end else 0 for i in range(self.game.num_actions)])) # Get only the positive portions of the regrets
+                self.last_strategies[node_id] /= np.sum(self.last_strategies[node_id], axis=1, keepdims=True) # Get the probability distribution across all actions, proportional to regrets
         
         compute_reach_probabilities(self.game, self.tree, self.last_strategies, self.initial_beliefs[traverser], traverser, self.reach_probabilities_buffer)
 
+        # Updates average strategy
         for node_name in self.tree.nodes:
             node = self.tree.nodes[node_name]
             state = self.game.node_to_state(node_name)
             if state[1] == traverser and not node['terminal']:
                 node_id = self.game.node_to_number(node_name)
                 start, end = self.game.get_bid_ranges(node_name)
-                self.sum_strategies[node_id] *= strat_discount
-                self.sum_strategies[node_id] += np.stack([self.reach_probabilities_buffer[node_id]]*self.game.num_actions, 1)*self.last_strategies[node_id]
-                self.average_strategies[node_id] = self.sum_strategies[node_id] / np.sum(self.sum_strategies[node_id], axis=1, keepdims=True)
+                
+                ### The following code is only relevant if using Linear CFR or CFR-D ###
                 if self.params['dcfr'] or self.params['linear_update']:
+                    self.sum_strategies[node_id] *= strat_discount
                     for hand in range(self.game.num_hands):
                         for action in range(start, end):
                             self.regrets[node_id][hand][action] *= (pos_discount if self.regrets[node_id][hand][action] > 0 else neg_discount)
+                ### End irrelevant section ###
+
+                self.sum_strategies[node_id] += np.stack([self.reach_probabilities_buffer[node_id]]*self.game.num_actions, 1)*self.last_strategies[node_id]
+                self.average_strategies[node_id] = self.sum_strategies[node_id] / np.sum(self.sum_strategies[node_id], axis=1, keepdims=True)
         
         self.num_steps[traverser] += 1
     
     def multistep(self):
+        """
+        Does multiple steps of the CFR algorithm. The exact number is specified in the params dictionary
+        """
         for i in range(self.params['num_iters']):
             self.step(i % 2, i)
             if i % 100 == 0:
@@ -302,11 +319,14 @@ def compute_reach_probabilities(game, tree, strategy, initial_beliefs, player, r
             parent_node_id = game.node_to_number(node_name[:-1])
 
             if player == last_action_player_id:
+                # The probability of reaching this node is the probability of reaching the parent node * the probability that the correct action is taken at this node
                 reach_probabilities[node_id] = reach_probabilities[parent_node_id]*strategy[parent_node_id, :, state[0]]
             
             else:
+                # We only care about contributions to the reach probability from the current player
                 reach_probabilities[node_id] = reach_probabilities[parent_node_id]
         else:
+            # In this case, we are dealing with the root node, which makes this our initial_beliefs
             reach_probabilities[node_id] = initial_beliefs
 
 
