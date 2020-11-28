@@ -104,15 +104,20 @@ class GELU(nn.Module):
         return nn.functional.gelu(x)
 
 
-pbs = PBS(('root', ), [[0.5, 0.5], [0.5, 0.5]])
+
 game = LiarsDice(num_dice=2, num_faces=3)
+beliefs = np.array([np.ones(game.num_hands) / game.num_hands for i in range(2)])
+pbs = PBS(('root', ), beliefs)
 
 
-
+"""
 G = recursive_game_tree(PBS, game)
-G.build_depth_limited_subgame(depth_limit=20)
-beliefs = np.ones(game.num_hands) / game.num_hands
+G.build_full_coin_game()
 params = {'dcfr': False, 'linear_update': False, 'num_iters': 10000}
 agent = CFR(game, G, build_value_net(game), beliefs, params)
 
 agent.multistep()
+
+"""
+ReBeL(pbs, game, build_value_net(game))
+

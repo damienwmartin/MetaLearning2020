@@ -29,15 +29,16 @@ class recursive_game_tree():
 		self.game = game
 		self.tree.add_node(('root',), depth=0, PBS=PBS, terminal = False, subgame_terminal = False)
 
+	"""
 	def build_depth_limited_subgame(self, depth_limit = 5, node_id = ('root',)):
 		'''
 		Recursively expand all nodes in the tree until you hit the depth limit
 		Mark nodes which are subgame terminal
 		'''
 		node = self.tree.nodes[node_id]
-		pbs = node['PBS']
+		# pbs = node['PBS']
 		num_actions = self.game.num_actions
-		num_infostates = pbs.num_infostates()
+		# num_infostates = pbs.num_infostates()
 		#initialize uniform_policy
 		node['policy'] = np.ones((num_infostates, num_actions))/num_actions
 		node['subgame_terminal'] = False
@@ -50,7 +51,21 @@ class recursive_game_tree():
 			children = list(self.tree.successors(node_id))
 			for child in children:
 				self.build_depth_limited_subgame(depth_limit, child)
-	
+	"""
+
+	def build_depth_limited_subgame(self, depth_limit=5, node_name=('root', )):
+		
+		node = self.tree.nodes[node_name]
+		initial_depth = len(node_name)
+		
+		nodes_to_add = [node_name]
+		while nodes_to_add != []:
+			self.tree.add_node(nodes_to_add[0], terminal=self.game.is_terminal(nodes_to_add[0]), subgame_terminal=(self.game.is_terminal(nodes_to_add[0]) or len(nodes_to_add[0]) == initial_depth + depth_limit))
+			if len(nodes_to_add[0]) < initial_depth + depth_limit:
+				for action in self.game.get_legal_moves(nodes_to_add[0]):
+					nodes_to_add.append(nodes_to_add[0] + (action, ))
+			print(self.tree.nodes[nodes_to_add[0]])
+			nodes_to_add = nodes_to_add[1:]
 
 	def build_full_coin_game(self):
 		self.tree.add_node(('root', 0), depth=1, terminal=True, subgame_terminal=True)
@@ -134,7 +149,8 @@ class recursive_game_tree():
 				node_id = self.sample_child(node_id, infostate)
 			node = self.tree.nodes[node_id]
 		#returns leaf PBS and the list of actions that led there
-		return(node['PBS'])
+		#return (node['PBS'])
+		return node['id']
 
 
 	def sample_child(self, node_id=('root',), infostate=None, random=False):
@@ -158,7 +174,7 @@ class recursive_game_tree():
 	def expand_node(self, node_id):
 		# Spawn a child node for every available actions
 		PBS = self.tree.nodes[node_id]['PBS']
-		legal_actions = self.game.get_legal_moves(PBS)
+		legal_actions = self.game.get_legal_moves(node_id)
 		
 		for action in legal_actions:
 			self.add_child(node_id, action)
@@ -173,15 +189,17 @@ class recursive_game_tree():
 		'''
 		node = self.tree.nodes[node_id]
 
-		new_pbs = self.transition(node['PBS'], action, node['policy'])
+		# new_pbs = self.transition(node['PBS'], action, node['policy'])
+		new_pbs = None
 		
 		new_node_id = (*node_id, action)
 
 		new_depth =  node['depth'] + 1
-		terminal = self.game.is_terminal(new_pbs)
+		# terminal = self.game.is_terminal(new_pbs)
+		terminal = self.game.is_terminal(new_node_id)
 		#If terminal get the payouts from the game and weight by probability of history
-		if terminal:
-			value = np.multiply(self.game.get_rewards(new_pbs), new_pbs.infostate_matrix()).sum().sum()
+		# if terminal:
+			# value = np.multiply(self.game.get_rewards(new_pbs), new_pbs.infostate_matrix()).sum().sum()
 
 		self.tree.add_node(new_node_id, depth = new_depth, PBS = new_pbs, terminal=terminal)
 		self.tree.add_edge(node_id, new_node_id, action=action, weight=sum(node['policy'][:,action]))
@@ -192,16 +210,17 @@ class recursive_game_tree():
 		given a PBS and an actions spawn the next PBS
 		'''
 		#reach out to the game wrapper for the next public state
-		next_public_state = self.game.take_action(pbs, action) 
+		# next_public_state = self.game.take_action(node_name, action) 
 		
 		#Get the next distribution of infostates if policy exists
-		next_infostate_probs = pbs.update_infostate_probs(policy, action)
+		# next_infostate_probs = pbs.update_infostate_probs(policy, action)
 
 		#Get the next player
-		player_number = 1 - pbs.player_turn
+		# player_number = 1 - pbs.player_turn
 
 		#return a new updated pbs after taking action
-		return(PBS(next_public_state, next_infostate_probs, player_number))
+		# return(PBS(next_public_state, next_infostate_probs, player_number))
+		return # node_name
 	
 	def __len__(self):
 		return len(self.tree.nodes)

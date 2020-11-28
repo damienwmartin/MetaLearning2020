@@ -1,20 +1,26 @@
 from .liars_dice_h import LiarsDice_C
 import numpy as np
 from .recursive_solving_cc import normalize_beliefs_inplace
+from subgame_solving_cc import build_solver
+
+from game_tree import recursive_game_tree
 
 
 class R1Runner:
 
-    def __init__(self, params, net, seed):
-        self.game = LiarsDice_C(params.num_dice, params.num_faces)
+    def __init__(self, game, params, net, seed, subgame_params):
+        self.game = game
         self.net = net
         self.seed = seed
         self.random_action_prob = params.random_action_prob
         self.sample_leaf_ = params.sample_leaf_ # Boolean value
+        self.subgame_params = subgame_params
 
         self.state = None
         self.beliefs = None
         self.num_iters = params.num_iters
+
+        self.tree = recursive
     
 
     def step():
@@ -22,9 +28,8 @@ class R1Runner:
         self.beliefs = ([1/self.game.num_hands]*self.game.num_hands, [1/self.game.num_hands] * self.game.num_hands)
 
         while not self.game.is_terminal(self.state):
-            solver = None
-            # solver = build_solver(params) Oof
-
+            solver = build_solver(self.game, self.state, self.beliefs, self.subgame_params, self.net)
+            
             act_iter = np.random.randint(num_iters)
             for i in range(act_iter):
                 solver.step(i % 2)

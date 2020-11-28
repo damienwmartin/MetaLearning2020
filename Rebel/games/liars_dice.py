@@ -1,7 +1,11 @@
 from game_wrappers import game_wrapper
 from game_tree import PBS
 import numpy as np
+from scipy.special import binom
+
 # import LiarsDice_C from Modified C Code?
+
+EPSILON = 1e-100
 
 class LiarsDice(game_wrapper):
     """
@@ -70,7 +74,7 @@ class LiarsDice(game_wrapper):
         """
         return (self.K_INITIAL_ACTION, 0)
     
-    def get_bid_range(self, node_name):
+    def get_bid_ranges(self, node_name):
         """
         Returns a tuple (start, end) which represent all possible legal actions that can be taken from that state
         """
@@ -82,11 +86,11 @@ class LiarsDice(game_wrapper):
             return (state[0] + 1, self.num_actions)
     
     #Note changed this to run with PBS
-    def is_terminal(self, PBS):
+    def is_terminal(self, node_name):
         """
         Determines whether or not the state inputted is a terminal state
         """
-        return (PBS.public == self.liar_call)
+        return (node_name[-1] == self.liar_call)
     
     def act(self, state, action):
         bid_range = self.get_bid_range(state)
@@ -95,14 +99,14 @@ class LiarsDice(game_wrapper):
         else:
             return (action, 1 - state.player)
 
-    def take_action(self, PBS, action):
+    def take_action(self, node_name, action):
         '''
         Version of act taking in PBS
         '''
-        bid_range = self.get_bid_range(PBS.public)
+        bid_range = self.get_bid_ranges(node_name)
         if (action < bid_range[0] or action >= bid_range[1]):
             raise Exception("Action invalid")
-        return action
+        return node_name + (action, )
 
         
     def iter_at_node(self, node_id):
@@ -122,63 +126,80 @@ class LiarsDice(game_wrapper):
         else:
             return (node_id[-1], (len(node_id) - 1) % 2)
     
-    def node_to_number(self, node):
+    def node_to_number(self, node_name):
         """
         Enumerates each of the nodes with a unique node_id. This node_id correspond to enumerating across each depth level (with the root node having an id of 0)
         """
-        node_id = 0
-        for i in range(node['depth']):
-            node_id += binom(self.num_actions, i)
-        last_action = node['id'][-2] if len(node['id']) > 2 else 0
-        for i in range(node['depth'], last_action):
-            node_id += (self.num_actions - i)
-        node_id += last_action
 
-        return node_id
+        if node_name == ('root',):
+            return 0
+        elif len(node_name) == 2:
+            return node_name[1]
+        else:
+            node_id = 0
+            for i in range(len(node_name) - 1):
+                node_id += binom(self.num_actions, i)
+            last_action = node_name[-2]
+            for i in range(len(node_name) - 1, last_action):
+                node_id += (self.num_actions - i)
+            node_id += last_action
+
+        return int(node_id)
     
-    #NOTE: Not constant, posibly mask the total range in game tree
-    def get_legal_moves(self, PBS):
-        start, end = self.get_bid_range(PBS.public)
+    #NOTE: Not constant, possibly mask the total range in game tree
+    def get_legal_moves(self, node_name):
+        start, end = self.get_bid_ranges(node_name)
         return [i for i in range(start, end)]
 
-    def sample_history(self, PBS, solver, random_action_prob, sampling_beliefs):
+    def sample_history(self, node_name, solver, random_action_prob, sampling_beliefs):
 
         # Samples a history from the PBS
 
         tree = solver.get_tree()
         path = []
 
-        node = tree.nodes[('root', )]
+        cur_node_name = node_name
+        node = tree.nodes[node_name]
         br_sampler = np.random.randint(2)
         strategy = solver.get_sampling_strategy()
+        beliefs = sampling_beliefs
 
         while not node['terminal']:
-            node_id = self.node_to_number(node)
+            node_id = self.node_to_number(cur_node_name)
             eps = np.random.uniform()
-            state = self.node_to_state(node)
-            action_begin, action_end = self.get_bid_range(state)
+            state = self.node_to_state(cur_node_name)
+            action_begin, action_end = self.get_bid_ranges(state)
             if state[1] == br_sampler and eps < random_action_prob:
                 action = np.random.randint(action_begin, action_end)
             else:
-                beliefs = sampling_beliefs[state[1]]
-                hand = np.random.choice(beliefs.size(), 1, p=beliefs)
-                policy = strategy[node_id][hand]
-                action = np.random.choice(policy.size(), 1, p=policy)
+                cur_beliefs = sampling_beliefs[state[1]]
+                hand = np.random.choice(cur_beliefs.size, 1, p=cur_beliefs)
+                policy = strategy[node_id][hand][0]
+                action = np.random.choice(policy.size, 1, p=policy)[0]
                 assert action >= action_begin and action < action_end
             
             policy = strategy[node_id]
-            sampling_beliefs[state[1]] *= policy[:, action]
+            sampling_beliefs[state[1]] *= np.reshape(policy[:, action], (self.num_hands, ))
             
-            normalize_beliefs_inplace(sampling_beliefs[state.player_id])
+            # normalize_beliefs_inplace(sampling_beliefs[state[1]])
+            sampling_beliefs[state[1]] += EPSILON
+            sampling_beliefs[state[1]] /= np.sum(sampling_beliefs[state[1]], axis=0, keepdims=True)
             path.append((node_id, action))
-            node = tree.nodes[node['id'] + (action, )]
-        
+            cur_node_name = cur_node_name + (action, )
+            node = tree.nodes[cur_node_name]
+
         for node_id, action in path:
             policy = solver.get_belief_propagation_strategy()[node_id]
-            sampling_beliefs[state[1]] = policy[:, action]
-            normalize_beliefs_inplace(self.beliefs[state[1]])
+
+            beliefs[state[1]] = np.reshape(policy[:, action], (self.num_hands,))
+            beliefs[state[1]] += EPSILON
+            beliefs[state[1]] /= np.sum(beliefs[state[1]], axis=0, keepdims=True)
+            # sampling_beliefs[state[1]] = np.reshape(policy[:, action], (self.num_hands, ))
+            # normalize_beliefs_inplace(self.beliefs[state[1]])
+            # sampling_beliefs += EPSILON
+            # sampling_beliefs[state[1]] /= np.sum(sampling_beliefs[state[1]], axis=0, keepdims=True)
     
-        return path
+        return cur_node_name, beliefs
 
     def get_init_PBS(self):
         public_state = -1

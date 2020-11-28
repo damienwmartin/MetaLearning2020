@@ -52,12 +52,13 @@ class PartialTreeTraverser:
         query_tensor = torch.tensor(self.write_query(('root', ), traverser))
         self.value_net.add_training_example(query_tensor, value_tensor)
 
-    def write_query(self, node_id, traverser):
+    def write_query(self, node_name, traverser):
         """
         Writes a single query to the buffer; the query corresponds to which node was seen by the traverser
         """
-        state = self.game.number_to_state(node_name)
-        write_index, buffer = write_query_to(self.game, traverser, state, self.reach_probabilities[0][node_id], self.reach_probabilities[1][node_id], buffer)
+        state = self.game.node_to_state(node_name)
+        node_id = self.game.node_to_number(node_name)
+        write_index, buffer = write_query_to(self.game, traverser, state, self.reach_probabilities[0][node_id], self.reach_probabilities[1][node_id])
         assert write_index == self.query_size
         return buffer
 
@@ -109,15 +110,16 @@ class PartialTreeTraverser:
             raise Exception("Game is currently not supported")
 
     def query_value_net(self, traverser):
+        self.net_query_buffer = []
         if self.pseudo_leaves_indices != []:
             N = len(self.pseudo_leaves_indices)
             scalers = []
-            for row in range(N):
-                node_id = self.pseudo_leaves_indices(row)
-                self.net_query_buffer.extend(self.write_query(node_id, traverser))
+            for node_name in self.pseudo_leaves_indices:
+                self.net_query_buffer.extend(self.write_query(node_name, traverser))
+                node_id = self.game.node_to_number(node_name)
                 scalers.append(np.sum(self.reach_probabilities[1 - traverser][node_id]))
             scalers = torch.tensor(scalers)
-            self.leaf_values = self.value_net.compute_values(np.reshape(np.array(self.net_query_buffer), (N, self.query_size)))
+            self.leaf_values = self.value_net(torch.tensor(np.reshape(np.array(self.net_query_buffer), (N, self.query_size))).float())
             self.leaf_values *= scalers.unsqueeze(1)
     
 
@@ -126,12 +128,11 @@ class PartialTreeTraverser:
         Gets the leaf values that are not actual leaves, and reads the torch tensor from the value net result
         """
         if self.pseudo_leaves_indices != []:
-            result_acc = self.leaf_values.cpu().numpy()
+            result_acc = self.leaf_values.detach().numpy()
             for row in range(len(self.pseudo_leaves_indices)):
                 node_name = self.pseudo_leaves_indices[row]
                 node_id = self.game.node_to_number(node_name)
                 self.traverser_values[node_id] = result_acc[row]
-
 
 class CFR(PartialTreeTraverser):
     """
@@ -275,7 +276,7 @@ class CFR(PartialTreeTraverser):
     def get_sampling_strategy(self):
         return self.last_strategies
     
-    def get_belief_propagation_strategies(self):
+    def get_belief_propagation_strategy(self):
         return self.last_strategies
     
     def print_strategy(self):
@@ -345,8 +346,10 @@ def get_uniform_reach_weighted_strategy(game, tree, initial_beliefs):
             node = tree.nodes[node_name]
             state = game.node_to_state(node_name)
             node_id = game.node_to_number(node_name)
+            start, end = game.get_bid_ranges(node_name)
             if not node['terminal'] and state[1] == traverser:
-                for action in game.get_legal_moves(node_name):
+                # for action in game.get_legal_moves(node_name):
+                for action in range(start, end):
                     strategy[node_id, :, action] *= reach_probabilities_buffer[node_id]
     
     return strategy
@@ -359,7 +362,7 @@ def compute_expected_terminal_values(game, last_bid, inverse, op_reach_probabili
     op_reach_probabilities -> input from precompute_terminal_leaf values was probability of reaching the node for each hand
     """
     inv = 2*int(inverse) - 1
-    values = self.game.compute_win_probability(last_bid, op_reach_probabilities)
+    values = compute_win_probability(game, last_bid, op_reach_probabilities)
     belief_sum = sum(op_reach_probabilities)
 
     # Normalize values based on the sum of op_reach_probabilities
@@ -399,7 +402,28 @@ def resize(x, size):
     else:
         return x[:size]
 
+
 def normalize_probabilities_safe(x, epsilon=1e-200):
     
     total = sum(x) + len(x)*epsilon
     return [(x_i + epsilon)/total for x_i in x]
+
+
+def compute_win_probability(game, action, beliefs):
+    unpacked_action = game.unpack_action(action)
+    believed_counts = [0 for i in range(game.total_num_dice + 1)]
+    for hand in range(len(beliefs)):
+        matches = game.num_matches(hand, unpacked_action[1])
+        believed_counts[matches] += beliefs[hand]
+    
+    for i in range(1, len(believed_counts)):
+        believed_counts[-1-i] += believed_counts[-i]
+    
+    values = []
+    for hand in range(len(beliefs)):
+        matches = game.num_matches(hand, unpacked_action[1])
+        left_to_win = max(0, unpacked_action[0] - matches)
+        prob_to_win = believed_counts[left_to_win]
+        values.append(prob_to_win)
+    
+    return values
