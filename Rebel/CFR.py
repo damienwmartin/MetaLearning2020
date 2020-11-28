@@ -7,6 +7,10 @@ EPSILON = 1e-100
 
 class PartialTreeTraverser:
 
+    """
+    This class is a base class that contains methods used for game tree traversal and associated calculations.
+    """
+
     def __init__(self, game, tree, value_net):
 
         self.game = game
@@ -174,32 +178,6 @@ class CFR(PartialTreeTraverser):
                         value += self.traverser_values[child_node_id]*self.last_strategies[public_node_id, :, action]
             
                 self.traverser_values[public_node_id] = value
-                   
-
-        """
-        for public_node_id in range(len(self.tree)):
-            node = self.tree[public_node_id]
-            if node.num_children():
-                state = node.state
-                value = [0 for i in range(len(self.traverser_values[public_node_id]))]
-                if state.player_id == traverser:
-                    for child_node, action in ChildrenActionIt(node, game):
-                        action_value = self.traverser_values[child_node]
-                        for hand in range(self.game.num_hands()):
-                            regrets[public_node_id][hand][action] += action_value[hand]
-                            value[hand] += action_value[hand]*last_strategies[public_node_id][hand][action]
-                    for hand in range(self.game.num_hands()):
-                        for child_node, action in ChildrenActionIt(node, game):
-                            regrets[public_node_id][hand][action] -= value[hand]
-                else:
-                    assert state.player_id == 1 - traverser
-                    for child_node in ChildrenIt(node):
-                        action_value = traverser_values[child_node]
-                        for hand in range(self.game.num_hands()):
-                            value[hand] += action_value[hand]
-                    
-                self.traverser_values[public_node_id] = value
-        """
     
     def step(self, traverser, i):
         """
@@ -213,11 +191,6 @@ class CFR(PartialTreeTraverser):
         self.root_values_means[traverser] = resize(self.root_values_means[traverser], len(self.root_values[traverser]))
 
         self.root_values_means[traverser] += alpha*(self.root_values[traverser] - self.root_values_means[traverser])
-
-        """
-        for i in range(len(self.root_values[traverser])):
-            self.root_values_means[traverser][i] += (self.root_values[traverser][i] - self.root_values_means[traverser][i])*alpha
-        """
 
         pos_discount = 1
         neg_discount = 1
@@ -234,16 +207,7 @@ class CFR(PartialTreeTraverser):
             if self.params['dcfr_beta'] > -5:
                 neg_discount = num_strategies**self.params['dcfr_beta'] / (num_strategies**self.params['dcfr_beta'] + 1)
             strat_discount = (num_strategies / (num_strategies + 1))**self.params['dcfr_gamma']
-        
-        """
-        for node_id in range(len(self.tree)):
-            if self.tree[node_id].num_children() and self.tree[node_id].state.player_id == traverser:
-                start, end = self.game.get_bid_ranges(self.tree[node_id].state)
-                for hand in range(self.game.num_hands())
-                    for action in range(start, end):
-                        self.last_strategies[node_id][hand][action] = max(regrets[node_id][hand][action], EPSILON)
-                    last_strategies[node][hand] = normalize_probabilities_safe(last_strategies[node][hand])
-        """
+    
 
         for node_name in self.tree.nodes:
             state = self.game.node_to_state(node_name)
@@ -255,18 +219,6 @@ class CFR(PartialTreeTraverser):
                 self.last_strategies[node_id] /= np.sum(self.last_strategies[node_id], axis=1, keepdims=True)
         
         compute_reach_probabilities(self.game, self.tree, self.last_strategies, self.initial_beliefs[traverser], traverser, self.reach_probabilities_buffer)
-
-        """
-        for node_id in range(len(self.tree)):
-            if self.tree[node_id].num_children() and self.tree[node_id].state.player_id == traverser:
-                action_begin, action_end = self.game.get_bid_ranges(self.tree[node_id].state)
-                for hand in range(self.game.num_hands()):
-                    for action in range(action_begin, action_end):
-                        self.regrets[node_id][hand][action] *= (pos_discount if self.regrets[node][i][a] > 0 else neg_discount)
-                        self.sum_strategies[node_id][hand][action] *= strat_discount
-                        self.sum_strategies[node_id][hand][action] += (self.reach_probabilities_buffer[node_id][hand] * self.last_strategies[node_id][hand][action])
-                        self.average_strategies[node_id][hand] = normalize_probabilities_safe(sum_strategies[node_id][hand])
-        """
 
         for node_name in self.tree.nodes:
             node = self.tree.nodes[node_name]
@@ -376,15 +328,6 @@ def get_uniform_reach_weighted_strategy(game, tree, initial_beliefs):
             if not node['terminal'] and state[1] == traverser:
                 for action in game.get_legal_moves(node_name):
                     strategy[node_id, :, action] *= reach_probabilities_buffer[node_id]
-
-        """
-        for node in range(len(tree)):
-            if tree[node].num_children() and tree_node.state.player_id == traverser:
-                action_begin, action_end = game.get_bid_ranges(tree[node].state)
-                for hand in range(game.num_hands()):
-                    for action in range(action_begin, action_end):
-                        strategy[node][hand][action] *= reach_probabilities_buffer[node][hand]
-        """
     
     return strategy
 
