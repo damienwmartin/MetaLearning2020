@@ -94,13 +94,17 @@ class recursive_game_tree():
 
 		else:
 			node['value']=0
+			i=0
 			for action in self.game.get_legal_moves(node['PBS']):
+				i+=1
 				next_state_ev = self.compute_ev((*node_id,action))
 				node['value'] = node['value'] + sum(node['policy'][:,action]) * next_state_ev
 				if verbose:
 					print(f"Adding value to {node_id} for {action}")
 					print('p(next_state) * next_state(value)  = x')
-					print(sum(node['policy'][:,action]), ' * ', next_state_ev, ' = ', sum(node['policy'][:,action]) * next_state_ev)
+					print(node['policy'][:,action], ' * ', next_state_ev, ' = ', sum(node['policy'][:,action]) * next_state_ev)
+			#renormalize
+			node['value'] = node['value'] / node['PBS'].num_infostates()
 			return(node['value'])
 
 	def update_policy(self):
