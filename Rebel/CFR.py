@@ -138,7 +138,7 @@ class CFR(PartialTreeTraverser):
         self.num_steps = [0, 0]
         
         self.average_strategies = get_uniform_strategy(game, self.tree)
-        self.last_strategies = self.average_strategies
+        self.last_strategies = get_uniform_strategy(game, self.tree)
         self.sum_strategies = get_uniform_reach_weighted_strategy(game, self.tree, self.initial_beliefs)
         self.regrets = np.zeros((len(tree), game.num_hands, game.num_actions))
         self.reach_probabilities_buffer = np.zeros((len(tree), game.num_hands))
@@ -153,30 +153,27 @@ class CFR(PartialTreeTraverser):
         self.precompute_all_reaches(self.last_strategies, self.initial_beliefs)
         self.precompute_all_leaf_values(traverser)
 
-        for public_node_name in self.tree.nodes:
+        for public_node_name in reversed(list(self.tree.nodes)):
             public_node = self.tree.nodes[public_node_name]
             public_node_id = self.game.node_to_number(public_node_name)
             if not public_node['subgame_terminal'] and not public_node['terminal']:
                 state = self.game.node_to_state(public_node_name)
                 start, end = self.game.get_bid_ranges(public_node_name)
                 value = np.zeros_like(self.traverser_values[public_node_id]) # array of size (num_hands, )
-                action_values = np.transpose(np.array([self.traverser_values[child_node_id] if child_node_id else [0]*game.num_hands for action, child_node_id in self.game.iter_at_node(public_node_id)])) # array of size (num_hands, num_actions)
                 if state[1] == traverser:
-                    self.regrets[public_node_id] += action_values
-                    # (num_hands, num_actions) -> (num_hands, num_actions)
-                    value += np.sum(action_values * self.last_strategies[public_node_id], axis=1)
-                    #(num_hands, )  [SUM 1](num_hands, num_actions)*(num_hands, num_actions)
-                    self.regrets[public_node_id] -= np.stack([value if i >= start and i < end else 0 for i in range(self.game.num_actions)], 1) #(num_hands, num_actions)
-                    
+                    for action in range(start, end):
+                        child_node_id = self.game.node_to_number(public_node_name + (action, ))
+                        self.regrets[public_node_id, :, action] += self.traverser_values[child_node_id] # array of size (num_hands, )
+                        value += self.traverser_values[child_node_id] * self.last_strategies[public_node_id, :, action] # array of size (num_hands, )
+                        
+                    for action in range(start, end):
+                        self.regrets[public_node_id, :, action] -= value # array of size (num_hands, )
                 else:
-                    assert state[1] == 1 - traverser
-                    value += np.sum(action_values, axis=1)  # (num_hands) + [SUM 1] (num_hands, num_actions)
+                    for action in range(start, end):
+                        child_node_id = self.game.node_to_number(public_node_name + (action, ))
+                        value += self.traverser_values[child_node_id]*self.last_strategies[public_node_id, :, action]
             
                 self.traverser_values[public_node_id] = value
-        
-        if i % 10 == 0:
-            print("self.reach", self.reach_probabilities[0], self.reach_probabilities[1])
-            print("traverser values", self.traverser_values)
                    
 
         """
@@ -255,9 +252,8 @@ class CFR(PartialTreeTraverser):
                 start, end = self.game.get_bid_ranges(node_name)
                 node_id = self.game.node_to_number(node_name)
                 self.last_strategies[node_id] = np.maximum(self.regrets[node_id], np.array([EPSILON if i >= start and i < end else 0 for i in range(self.game.num_actions)]))
-                for hand in range(self.game.num_hands):
-                    self.last_strategies[node_id][hand] = normalize_probabilities_safe(self.last_strategies[node_id][hand])
-
+                self.last_strategies[node_id] /= np.sum(self.last_strategies[node_id], axis=1, keepdims=True)
+        
         compute_reach_probabilities(self.game, self.tree, self.last_strategies, self.initial_beliefs[traverser], traverser, self.reach_probabilities_buffer)
 
         """
@@ -280,22 +276,23 @@ class CFR(PartialTreeTraverser):
                 start, end = self.game.get_bid_ranges(node_name)
                 self.sum_strategies[node_id] *= strat_discount
                 self.sum_strategies[node_id] += np.stack([self.reach_probabilities_buffer[node_id]]*self.game.num_actions, 1)*self.last_strategies[node_id]
-                for hand in range(self.game.num_hands):
-                    if self.params['dcfr'] or self.params['linear_update']:
+                self.average_strategies[node_id] = self.sum_strategies[node_id] / np.sum(self.sum_strategies[node_id], axis=1, keepdims=True)
+                if self.params['dcfr'] or self.params['linear_update']:
+                    for hand in range(self.game.num_hands):
                         for action in range(start, end):
                             self.regrets[node_id][hand][action] *= (pos_discount if self.regrets[node_id][hand][action] > 0 else neg_discount)
-                    self.average_strategies[node_id][hand] = normalize_probabilities_safe(self.sum_strategies[node_id][hand])
-
+        
         self.num_steps[traverser] += 1
     
     def multistep(self):
         for i in range(self.params['num_iters']):
             self.step(i % 2, i)
-            if i % 10 == 0:
+            if i % 100 == 0:
                 print('Iteration %d', i)
-                print("Player 1 strategy:", self.get_strategy()[0])
-                print("Player 2 strategy:", self.get_strategy()[2])
-    
+                print("Player 1 average strategy", self.get_strategy()[0])
+                print("Player 2 average strategy", self.get_strategy()[2])
+
+
     def update_value_network(self):
         self.add_training_example(0, self.get_hand_values(0))
         self.add_training_example(1, self.get_hand_values(1))
@@ -351,7 +348,6 @@ def compute_reach_probabilities(game, tree, strategy, initial_beliefs, player, r
             state = game.node_to_state(node_name)
             last_action_player_id = game.node_to_state(node_name[:-1])[1]
             parent_node_id = game.node_to_number(node_name[:-1])
-
 
             if player == last_action_player_id:
                 reach_probabilities[node_id] = reach_probabilities[parent_node_id]*strategy[parent_node_id, :, state[0]]
