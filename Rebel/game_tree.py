@@ -115,33 +115,42 @@ class recursive_game_tree():
 	def sample_leaf(self):
 		node_id = ('root',)
 		node = self.tree.nodes[('root',)]
+		pbs = node['PBS']
+
+		#Choose a player to act randomly
 		random_player = np.random.choice([0,1])
-		#TODO: figure out exactly how histories are represented
-		h = self.game.sample_history(node)
+		
+		#sample a history (starting hand for each player)
+		infostates = [np.random.randint(pbs.num_infostates(i)) for i in range(2)]
 		
 		while not node['terminal'] and not node['subgame_terminal']:
+			#Get infostate for current_player
+			infostate = infostates[node['PBS'].player_turn]
+			#sample some actions randomly to encourage exploration
 			if random_player and (np.random.random()<.25):
-				node = self.sample_child(node, h, random=True)
+				node_id = self.sample_child(node_id, infostate, random=True)
+			#otherwise sample a child according to the policy at that infostate
 			else:
-				node = self.sample_child(node,h)
-			random_player =  not random_player
+				node_id = self.sample_child(node_id, infostate)
+			node = self.tree.nodes[node_id]
+		#returns leaf PBS and the list of actions that led there
+		return(node['PBS'])
 
-		return(node)
 
+	def sample_child(self, node_id=('root',), infostate=None, random=False):
+		node = self.tree.nodes[node_id]
+		pbs = node['PBS']
 
-	def sample_child(self, node, infostate=None, random=False):
-		#TODO: Make the policy a matrix instead of dict
 		if random:
 			probs = None
 
-		elif infostate!=None:
-			probs = node[:,'policy']
 		else:
-			probs = node['policy'].sum(axis=1) 
+			probs = node['policy'][infostate] 
+
 
 		children = list(self.tree.successors(node_id))
-		child_id = np.random.choice(children, probs)
-		return(self.tree.nodes[child_id])
+		child_id = children[np.random.choice(len(children), p=probs)]
+		return(child_id)
 
 
 
@@ -169,9 +178,9 @@ class recursive_game_tree():
 		new_node_id = (*node_id, action)
 
 		new_depth =  node['depth'] + 1
-
+		terminal = self.game.is_terminal(new_pbs)
 		#If terminal get the payouts from the game and weight by probability of history
-		if terminal := self.game.is_terminal(new_pbs):
+		if terminal:
 			value = np.multiply(self.game.get_rewards(new_pbs), new_pbs.infostate_matrix()).sum().sum()
 
 		self.tree.add_node(new_node_id, depth = new_depth, PBS = new_pbs, terminal=terminal)
@@ -213,11 +222,13 @@ class PBS():
 		#list of probability matrices for each players infostate, (# players, infostate size)
 		self.infostate_probs = infostate_probs 		
 		
-	def num_infostates(self):
+	def num_infostates(self, player=None):
 		'''
 		for just the current player
 		'''
-		return(len(self.infostate_probs[self.player_turn]))
+		if player == None:
+			player = self.player_turn
+		return(len(self.infostate_probs[player]))
 
 	def update_infostate_probs(self, policy, action, verbose = True):
 		'''
