@@ -95,7 +95,7 @@ class GameTree:
 
             prev_player = self.game.node_to_state(cur_node[:-1])[1]
 
-            self.tree.nodes[cur_node]['reach_prob'] = self.tree.nodes[cur_node[:-1]]['reach_prob']
+            self.tree.nodes[cur_node]['reach_prob'] = 1 * self.tree.nodes[cur_node[:-1]]['reach_prob']
             if prev_player:
                 self.tree.nodes[cur_node]['reach_prob'][1] *= self.tree.nodes[cur_node[:-1]][strategy][:, state[0]]
             else:
@@ -258,11 +258,10 @@ class CFR(GameTree):
         self.precompute_all_reaches(strat='cur')
         self.precompute_all_leaf_values(traverser)
 
-        for node_name in reversed(list(self.enumerate_subgame())):
+        for node_name in reversed(self.enumerate_subgame()):
             node = self.tree.nodes[node_name]
             if not node['terminal'] and not node['subgame_terminal']:
                 state = self.game.node_to_state(node_name)
-                print(node_name, state)
                 value = np.zeros(self.game.num_hands)
                 if state[1] == traverser:
                     for action in self.game.get_legal_moves(node_name):
@@ -273,9 +272,6 @@ class CFR(GameTree):
                     
                     for action in self.game.get_legal_moves(node_name):
                         node['regrets'][:, action] -= value
-
-                    print("Regrets ", node['regrets'], " for node ", node_name)
-                    print("Value ", node['value'], " for node ", node_name)
             
                 else:
                     for action in self.game.get_legal_moves(node_name):
@@ -502,15 +498,15 @@ def rebel(game, value_net, T=1000):
 
     while not cur_node['terminal']:
 
-        solver.build_depth_limited_subgame(cur_node_id, depth_limit=5)
+        solver.build_depth_limited_subgame(cur_node_id, depth_limit=2)
         t_sample = np.random.randint(T)
 
         for t in range(T):
             
-            solver.step(t % 2)
-            
-            if t % 50 == 0:
+            if t % 100 == 0:
                 print("CFR Iteration number ", t)
+            
+            solver.step(t % 2)
 
             if t == t_sample:
                 print("Sampling leaf at ", t_sample)
@@ -523,14 +519,14 @@ def rebel(game, value_net, T=1000):
         cur_node = solver.tree.nodes[cur_node_id]
     
     if isinstance(game, CoinGame):
-        print("Player 1 strategy:", solver.tree.nodes[('root', )]['avg_strategy'])
-        print("Player 2 strategy:", solver.tree.nodes[('root', 1)]['avg_strategy'])
+        print("Final player 1 strategy:", solver.tree.nodes[('root', )]['avg_strategy'])
+        print("Final player 2 strategy:", solver.tree.nodes[('root', 1)]['avg_strategy'])
 
 
 
 # Testing
 
-# game = LiarsDice(num_dice=2, num_faces=3)
-game = CoinGame()
+game = LiarsDice(num_dice=2, num_faces=3)
+
 v_net = build_value_net(game)
-rebel(game, v_net, 10)
+rebel(game, v_net)
