@@ -58,14 +58,14 @@ class GameTree:
                 self.tree.add_node(cur_node, 
                                     terminal=self.game.is_terminal(cur_node), 
                                     subgame_terminal=(self.game.is_terminal(cur_node) or len(cur_node) == initial_depth + depth_limit),
-                                    reach_prob = np.zeros((2, game.num_hands)),
+                                    reach_prob = np.zeros((2, self.game.num_hands)),
                                     reach_prob_buffer = np.zeros(self.game.num_hands),
                                     cur_strategy = np.zeros((self.game.num_hands, self.game.num_actions)),
                                     sum_strategy = np.zeros((self.game.num_hands, self.game.num_actions)),
                                     avg_strategy = np.zeros((self.game.num_hands, self.game.num_actions)),
                                     regrets = np.zeros((self.game.num_hands, self.game.num_actions)),
                                     value = np.zeros(self.game.num_hands),
-                                    best_response = np.zeros((game.num_hands, game.num_actions)))
+                                    best_response = np.zeros((self.game.num_hands, self.game.num_actions)))
             
             if self.game.is_terminal(cur_node):
                 self.terminal_nodes.append(cur_node)
@@ -207,8 +207,8 @@ class GameTree:
 
         for node_name in self.enumerate_subgame():
             legal_moves = self.game.get_legal_moves(node_name)
-            self.tree.nodes[node_name]['cur_strategy'] = np.array([[1/len(legal_moves) if i in legal_moves else 0 for i in range(game.num_actions)] for j in range(game.num_hands)])
-            self.tree.nodes[node_name]['avg_strategy'] = np.array([[1/len(legal_moves) if i in legal_moves else 0 for i in range(game.num_actions)] for j in range(game.num_hands)])
+            self.tree.nodes[node_name]['cur_strategy'] = np.array([[1/len(legal_moves) if i in legal_moves else 0 for i in range(self.game.num_actions)] for j in range(self.game.num_hands)])
+            self.tree.nodes[node_name]['avg_strategy'] = np.array([[1/len(legal_moves) if i in legal_moves else 0 for i in range(self.game.num_actions)] for j in range(self.game.num_hands)])
         
         for traverser in [0, 1]:
             self.fill_reach_prob_buffer(traverser, strat='cur')
@@ -217,7 +217,7 @@ class GameTree:
                 node = self.tree.nodes[node_name]
                 state = self.game.node_to_state(node_name)
                 if not node['terminal'] and state[1] == traverser:
-                    node['sum_strategy'] = node['cur_strategy']*np.reshape(node['reach_prob_buffer'], (game.num_hands, 1))
+                    node['sum_strategy'] = node['cur_strategy']*np.reshape(node['reach_prob_buffer'], (self.game.num_hands, 1))
     
     def add_training_example(self, traverser, values, D_v):
         """
@@ -317,7 +317,7 @@ class CFR(GameTree):
             node = self.tree.nodes[node_name]
             if state[1] == traverser and not node['terminal']:
                 legal_moves = self.game.get_legal_moves(node_name)
-                node['cur_strategy'] = np.maximum(node['regrets'], np.array([[EPSILON if i in legal_moves else 0 for i in range(self.game.num_actions)] for j in range(game.num_hands)]))
+                node['cur_strategy'] = np.maximum(node['regrets'], np.array([[EPSILON if i in legal_moves else 0 for i in range(self.game.num_actions)] for j in range(self.game.num_hands)]))
                 node['cur_strategy'] /= np.sum(node['cur_strategy'], axis=1, keepdims=True)
         
         self.fill_reach_prob_buffer(traverser)
@@ -424,7 +424,7 @@ class CFR(GameTree):
             if not node['terminal'] and not node['subgame_terminal']:
                 state = self.game.node_to_state(node_name)
                 if state[1] == traverser:
-                    node['best_response'] = np.zeros((game.num_hands, game.num_actions))
+                    node['best_response'] = np.zeros((self.game.num_hands, self.game.num_actions))
                     value = np.full((self.game.num_hands,), np.NINF)
                     best_action = [0 for i in range(self.game.num_hands)]
                     for action in self.game.get_legal_moves(node_name):
@@ -562,7 +562,7 @@ def rebel(game, value_net, T=1000, solver=None):
     return D_v, solver
 
 
-
+from tqdm import tqdm
 def train(game, value_net, epochs, games_per_epoch, T=1000):
 
 
@@ -575,7 +575,7 @@ def train(game, value_net, epochs, games_per_epoch, T=1000):
         print("Starting epoch ", i)
         train_x = []
         train_y = []
-        for j in range(games_per_epoch):
+        for j in tqdm(range(games_per_epoch)):
 			#Play a full game with rebel
             D_v, solver = rebel(game, value_net, T, solver)
             train_x.extend([x[0] for x in D_v])
@@ -599,9 +599,9 @@ def train(game, value_net, epochs, games_per_epoch, T=1000):
 
 
 # Testing
+if __name__ == "__main__":
+    game = LiarsDice(num_dice=2, num_faces=3)
 
-game = LiarsDice(num_dice=2, num_faces=3)
-
-v_net = build_value_net(game)
-end_solver = train(game, v_net, 10, 4, 50)
-print(end_solver.compute_exploitability())
+    v_net = build_value_net(game)
+    end_solver = train(game, v_net, 10, 4, 50)
+    print(end_solver.compute_exploitability())
