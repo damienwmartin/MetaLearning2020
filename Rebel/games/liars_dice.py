@@ -151,56 +151,6 @@ class LiarsDice(game_wrapper):
         start, end = self.get_bid_ranges(node_name)
         return [i for i in range(start, end)]
 
-    def sample_history(self, node_name, solver, random_action_prob, sampling_beliefs):
-
-        # Samples a history from the PBS
-
-        tree = solver.get_tree()
-        path = []
-
-        cur_node_name = node_name
-        node = tree.nodes[node_name]
-        br_sampler = np.random.randint(2)
-        strategy = solver.get_sampling_strategy()
-        beliefs = sampling_beliefs
-
-        while not node['terminal']:
-            node_id = self.node_to_number(cur_node_name)
-            eps = np.random.uniform()
-            state = self.node_to_state(cur_node_name)
-            action_begin, action_end = self.get_bid_ranges(state)
-            if state[1] == br_sampler and eps < random_action_prob:
-                action = np.random.randint(action_begin, action_end)
-            else:
-                cur_beliefs = sampling_beliefs[state[1]]
-                hand = np.random.choice(cur_beliefs.size, 1, p=cur_beliefs)
-                policy = strategy[node_id][hand][0]
-                action = np.random.choice(policy.size, 1, p=policy)[0]
-                assert action >= action_begin and action < action_end
-            
-            policy = strategy[node_id]
-            sampling_beliefs[state[1]] *= np.reshape(policy[:, action], (self.num_hands, ))
-            
-            # normalize_beliefs_inplace(sampling_beliefs[state[1]])
-            sampling_beliefs[state[1]] += EPSILON
-            sampling_beliefs[state[1]] /= np.sum(sampling_beliefs[state[1]], axis=0, keepdims=True)
-            path.append((node_id, action))
-            cur_node_name = cur_node_name + (action, )
-            node = tree.nodes[cur_node_name]
-
-        for node_id, action in path:
-            policy = solver.get_belief_propagation_strategy()[node_id]
-
-            beliefs[state[1]] = np.reshape(policy[:, action], (self.num_hands,))
-            beliefs[state[1]] += EPSILON
-            beliefs[state[1]] /= np.sum(beliefs[state[1]], axis=0, keepdims=True)
-            # sampling_beliefs[state[1]] = np.reshape(policy[:, action], (self.num_hands, ))
-            # normalize_beliefs_inplace(self.beliefs[state[1]])
-            # sampling_beliefs += EPSILON
-            # sampling_beliefs[state[1]] /= np.sum(sampling_beliefs[state[1]], axis=0, keepdims=True)
-    
-        return cur_node_name, beliefs
-
     def get_init_PBS(self):
         public_state = -1
         player_turn = 0

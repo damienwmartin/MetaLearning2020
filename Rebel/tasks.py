@@ -119,5 +119,5 @@ agent = CFR(game, G, build_value_net(game), beliefs, params)
 agent.multistep()
 
 """
-ReBeL(pbs, game, build_value_net(game))
+# ReBeL(pbs, game, build_value_net(game))
 
