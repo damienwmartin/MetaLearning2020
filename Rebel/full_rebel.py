@@ -425,7 +425,7 @@ class CFR(GameTree):
                 state = self.game.node_to_state(node_name)
                 if state[1] == traverser:
                     node['best_response'] = np.zeros((game.num_hands, game.num_actions))
-                    value = [np.NINF for i in range(self.game.num_hands)]
+                    value = np.full((self.game.num_hands,), np.NINF)
                     best_action = [0 for i in range(self.game.num_hands)]
                     for action in self.game.get_legal_moves(node_name):
                         new_value = self.tree.nodes[node_name + (action, )]['value']
@@ -439,11 +439,11 @@ class CFR(GameTree):
                         node['best_response'][hand][best_action[hand]] = 1
                 
                 else:
-                    value = np.zeros(self.game.num_hands)
+                    value = np.zeros((self.game.num_hands,))
                     beliefs = (node['reach_prob'][1 - traverser] + EPSILON) / np.sum(node['reach_prob'][1 - traverser] + EPSILON, axis=0, keepdims=True)
                     for action in self.game.get_legal_moves(node_name):
                         child_node = self.tree.nodes[node_name + (action, )]
-                        value += np.sum(beliefs*node['avg_strategy'][:, action], axis=0)*child_node['value']
+                        value += np.sum(beliefs*node['avg_strategy'][:, action], axis=0)*np.array(child_node['value'])
                     
                     node['value'] = value
         
@@ -453,7 +453,7 @@ class CFR(GameTree):
         value0 = self.get_best_response(0)
         value1 = self.get_best_response(1)
 
-        return 0.5*(np.mean(value0 + value1))
+        return value0, value1
 
     
 
@@ -581,16 +581,16 @@ def train(game, value_net, epochs, games_per_epoch, T=1000):
             train_x.extend([x[0] for x in D_v])
             train_y.extend([y[1] for y in D_v])
         
-        train_x = torch.tensor(train_x)
-        train_y = torch.tensor(train_y)
+        train_x = torch.stack(train_x, 0).float()
+        train_y = torch.stack(train_y, 0).float()
         
-        opt.zero_grad()
-        output = v_net.forward(train_x)
+        value_optimizer.zero_grad()
+        output = value_net.forward(train_x)
         loss = loss_fn(output, train_y)
         loss.backward()
-        opt.step()
+        value_optimizer.step()
         
-        if i % 10 == 0:
+        if i % 2 == 0:
             print(f'Epoch {i}: Loss {loss}')
     
     return solver
@@ -603,5 +603,5 @@ def train(game, value_net, epochs, games_per_epoch, T=1000):
 game = LiarsDice(num_dice=2, num_faces=3)
 
 v_net = build_value_net(game)
-end_solver = train(game, v_net, 20, 32, 100)
+end_solver = train(game, v_net, 10, 4, 50)
 print(end_solver.compute_exploitability())
