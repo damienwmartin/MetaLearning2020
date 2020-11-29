@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.optim as optim
 import networkx as nx
 
 from games.liars_dice import LiarsDice
@@ -23,7 +24,8 @@ class GameTree:
                            sum_strategy = np.zeros((game.num_hands, game.num_actions)),
                            avg_strategy = np.zeros((game.num_hands, game.num_actions)),
                            regrets = np.zeros((game.num_hands, game.num_actions)),
-                           value = np.zeros(game.num_hands))
+                           value = np.zeros(game.num_hands),
+                           best_response = np.zeros((game.num_hands, game.num_actions)))
         
         self.value_net = value_net
         self.terminal_nodes = []
@@ -48,12 +50,9 @@ class GameTree:
         for node_name in self.tree.nodes:
             self.tree.nodes[node_name]['subgame_terminal'] = False
         initial_depth = len(root_node)
-        nodes_to_add = [node_name]
+        nodes_to_add = [root_node]
         while nodes_to_add != []:
             cur_node = nodes_to_add[0]
-            if len(cur_node) < initial_depth + depth_limit:
-                for action in self.game.get_legal_moves(cur_node):
-                    nodes_to_add.append(cur_node + (action, ))
             
             if cur_node not in self.tree.nodes:
                 self.tree.add_node(cur_node, 
@@ -65,7 +64,8 @@ class GameTree:
                                     sum_strategy = np.zeros((self.game.num_hands, self.game.num_actions)),
                                     avg_strategy = np.zeros((self.game.num_hands, self.game.num_actions)),
                                     regrets = np.zeros((self.game.num_hands, self.game.num_actions)),
-                                    value = np.zeros(self.game.num_hands))
+                                    value = np.zeros(self.game.num_hands),
+                                    best_response = np.zeros((game.num_hands, game.num_actions)))
             
             if self.game.is_terminal(cur_node):
                 self.terminal_nodes.append(cur_node)
@@ -73,6 +73,10 @@ class GameTree:
             elif len(cur_node) == initial_depth + depth_limit:
                 self.pseudo_leaf_nodes.append(cur_node)
                 self.tree.nodes[cur_node]['subgame_terminal'] = True
+            
+            else:
+                for action in self.game.get_legal_moves(cur_node):
+                    nodes_to_add.append(cur_node + (action, ))
             
             nodes_to_add = nodes_to_add[1:]
         
@@ -220,7 +224,7 @@ class GameTree:
         Adds a datapoint for the value_net
         """
         value_tensor = torch.tensor(values)
-        query_tensor = torch.tensor(self.write_query(('root', ), traverser))
+        query_tensor = torch.tensor(self.write_query(self.cur_root_node, traverser))
         D_v.append((query_tensor, value_tensor))
     
     def populate_leaf_values(self):
@@ -336,8 +340,6 @@ class CFR(GameTree):
         
         self.num_steps[traverser] += 1
                 
-
-    
     def multistep(self):
         """
         Does multiple steps of the CFR algorithm. The exact number is specified in the params dictionary
@@ -358,7 +360,7 @@ class CFR(GameTree):
         beliefs = (node['reach_prob'] + EPSILON) / np.sum(node['reach_prob'] + EPSILON, axis=1, keepdims=True)
         sampling_beliefs = (node['reach_prob'] + EPSILON) / np.sum(node['reach_prob'] + EPSILON, axis=1, keepdims=True)
 
-        while not node['terminal']:
+        while not node['terminal'] and not node['subgame_terminal']:
             eps = np.random.uniform()
             state = self.game.node_to_state(cur_node_name)
             if state[1] == br_sampler and eps < random_action_prob:
@@ -411,6 +413,77 @@ class CFR(GameTree):
     
     def get_tree(self):
         return self.tree
+    
+    def get_best_response(self, traverser):
+        self.precompute_all_reaches(strat='avg')
+        self.precompute_all_leaf_values(traverser)
+
+        for node_name in reversed(list(self.tree.nodes)):
+            node = self.tree.nodes[node_name]
+            node['best_response'] = np.zeros((game.num_hands, game.num_actions))
+
+            if not node['terminal'] and not node['subgame_terminal']:
+                state = self.game.node_to_state(node_name)
+                if state[1] == traverser:
+                    value = [np.NINF for i in range(self.game.num_hands)]
+                    best_action = [0 for i in range(self.game.num_hands)]
+                    for action in self.get_legal_moves(node_name):
+                        new_value = self.tree.nodes[node_name + (action, )]['value']
+                        for hand in range(self.game.num_hands):
+                            if new_value[hand] > value[hand]:
+                                value[hand] = new_value[hand]
+                                best_action[hand] = action
+                    
+                    node['value'] = value
+                    for hand in range(self.game.num_hands):
+                        node['best_response'][hand][best_action[hand]] = 1
+                
+                else:
+                    for action in self.game.get_legal_moves(node_name):
+                        child_node = self.tree.nodes[node_name + (action, )]
+        
+        return self.tree.nodes[('root',)]['value']
+    
+    def compute_exploitability(self):
+        value0 = self.get_best_response(0)
+        value1 = self.get_best_response(1)
+
+        return 0.5*np.mean(value0 + value1)
+
+
+    """
+    def compute_br(traverser, opponent_strategy, initial_beliefs, values):
+        self.precompute_reaches(opponent_strategy, initial_beliefs)
+        self.precompute_all_leaf_values(traverser)
+
+        for public_node_id in range(len(tree)):
+            node = self.tree[public_node_id]
+            value = self.traverser_values[public_node_id]
+            
+            if node.num_children():
+                state = node.state
+                value = [0]*len(value)
+                if state.player_id == traverser:
+                    best_action = [0 for i in range(self.game.num_hands())]
+                    for child_node, action in ChildrenActionIt(node, game):
+                        new_value = self.traverser_values[child_node]
+                        for hand in range(self.game.num_hands()):
+                            if child_node == node.children_begin or new_value[hand] > value[hand]:
+                                value[hand] = new_value[hand]
+                                best_action[hand] = action
+                    for hand in range(self.game.num_hands()):
+                        self.br_strategies[public_node_id][hand] = [0 for i in range(self.game.num_actions())]
+                        self.br_strategies[public_node_id][hand][best_action[hand]] = 1
+                else:
+                    for child_node in ChildrenIt(node):
+                        new_value = traverser_values[child_node]
+                        for hand in range(self.game.num_hands()):
+                            value[hand] += new_value[hand]
+        
+        values = self.traverser_values[0] #TODO: Value points to somewhere. Find out where
+        return self.br_strategies
+        """
+
     
 
 def compute_expected_terminal_values(game, last_bid, inverse, op_reach_probabilities):
@@ -486,11 +559,13 @@ def write_query_to(game, traverser, state, reaches1, reaches2):
 
 
 
-def rebel(game, value_net, T=1000):
+def rebel(game, value_net, T=1000, solver=None):
 
-    initial_beliefs = np.ones((2, game.num_hands)) / game.num_hands
-    params = {'dcfr': False, 'linear_update': False}
-    solver = CFR(game, value_net, initial_beliefs, params)
+    if solver is None:
+        initial_beliefs = game.get_initial_beliefs()
+        params = {'dcfr': False, 'linear_update': False}
+        solver = CFR(game, value_net, initial_beliefs, params)
+    
     D_v = []
 
     cur_node = solver.tree.nodes[('root', )]
@@ -498,29 +573,57 @@ def rebel(game, value_net, T=1000):
 
     while not cur_node['terminal']:
 
-        solver.build_depth_limited_subgame(cur_node_id, depth_limit=2)
+        solver.build_depth_limited_subgame(cur_node_id, depth_limit=5)
         t_sample = np.random.randint(T)
 
         for t in range(T):
             
-            if t % 100 == 0:
-                print("CFR Iteration number ", t)
-            
             solver.step(t % 2)
 
             if t == t_sample:
-                print("Sampling leaf at ", t_sample)
                 next_node, beliefs = solver.sample_leaf(cur_node_id, 0.1)
         
         solver.update_value_network(D_v)
-        print("Updated D_v!", D_v)
 
         cur_node_id = next_node
         cur_node = solver.tree.nodes[cur_node_id]
     
-    if isinstance(game, CoinGame):
-        print("Final player 1 strategy:", solver.tree.nodes[('root', )]['avg_strategy'])
-        print("Final player 2 strategy:", solver.tree.nodes[('root', 1)]['avg_strategy'])
+    return D_v, solver
+
+
+
+def train(game, value_net, epochs, games_per_epoch, T=1000):
+
+
+    solver = None
+    value_optimizer = optim.Adam(value_net.parameters())
+    loss_fn = nn.MSELoss()
+    value_net.train()
+    
+    for i in range(epochs):
+        print("Starting epoch ", i)
+        train_x = []
+        train_y = []
+        for j in range(games_per_epoch):
+			#Play a full game with rebel
+            D_v, solver = rebel(game, value_net, T, solver)
+            train_x.extend([x[0] for x in D_v])
+            train_y.extend([y[1] for y in D_v])
+        
+        train_x = torch.tensor(train_x)
+        train_y = torch.tensor(train_y)
+        
+        opt.zero_grad()
+        output = v_net.forward(train_x)
+        loss = loss_fn(output, train_y)
+        loss.backward()
+        opt.step()
+        
+        if i % 10 == 0:
+            print(f'Epoch {i}: Loss {loss}')
+    
+    return solver
+
 
 
 
@@ -529,4 +632,5 @@ def rebel(game, value_net, T=1000):
 game = LiarsDice(num_dice=2, num_faces=3)
 
 v_net = build_value_net(game)
-rebel(game, v_net)
+end_solver = train(game, v_net, 20, 32, 1000)
+print(end_solver.compute_exploitability())

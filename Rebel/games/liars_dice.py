@@ -126,30 +126,13 @@ class LiarsDice(game_wrapper):
         else:
             return (node_id[-1], (len(node_id) - 1) % 2)
     
-    def node_to_number(self, node_name):
-        """
-        Enumerates each of the nodes with a unique node_id. This node_id correspond to enumerating across each depth level (with the root node having an id of 0)
-        """
-
-        if node_name == ('root',):
-            return 0
-        elif len(node_name) == 2:
-            return node_name[1]
-        else:
-            node_id = 0
-            for i in range(len(node_name) - 1):
-                node_id += binom(self.num_actions, i)
-            last_action = node_name[-2]
-            for i in range(len(node_name) - 1, last_action):
-                node_id += (self.num_actions - i)
-            node_id += last_action
-
-        return int(node_id)
-    
     #NOTE: Not constant, possibly mask the total range in game tree
     def get_legal_moves(self, node_name):
         start, end = self.get_bid_ranges(node_name)
         return [i for i in range(start, end)]
+    
+    def get_initial_beliefs(self):
+        return np.ones((2, self.num_hands)) / self.num_hands
 
     def get_init_PBS(self):
         public_state = -1
