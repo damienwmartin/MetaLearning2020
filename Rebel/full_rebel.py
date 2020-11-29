@@ -420,27 +420,32 @@ class CFR(GameTree):
 
         for node_name in reversed(list(self.tree.nodes)):
             node = self.tree.nodes[node_name]
-            node['best_response'] = np.zeros((game.num_hands, game.num_actions))
 
             if not node['terminal'] and not node['subgame_terminal']:
                 state = self.game.node_to_state(node_name)
                 if state[1] == traverser:
+                    node['best_response'] = np.zeros((game.num_hands, game.num_actions))
                     value = [np.NINF for i in range(self.game.num_hands)]
                     best_action = [0 for i in range(self.game.num_hands)]
-                    for action in self.get_legal_moves(node_name):
+                    for action in self.game.get_legal_moves(node_name):
                         new_value = self.tree.nodes[node_name + (action, )]['value']
                         for hand in range(self.game.num_hands):
                             if new_value[hand] > value[hand]:
                                 value[hand] = new_value[hand]
                                 best_action[hand] = action
                     
-                    node['value'] = value
+                    node['value'] = np.array(value)
                     for hand in range(self.game.num_hands):
                         node['best_response'][hand][best_action[hand]] = 1
                 
                 else:
+                    value = np.zeros(self.game.num_hands)
+                    beliefs = (node['reach_prob'][1 - traverser] + EPSILON) / np.sum(node['reach_prob'][1 - traverser] + EPSILON, axis=0, keepdims=True)
                     for action in self.game.get_legal_moves(node_name):
                         child_node = self.tree.nodes[node_name + (action, )]
+                        value += np.sum(beliefs*node['avg_strategy'][:, action], axis=0)*child_node['value']
+                    
+                    node['value'] = value
         
         return self.tree.nodes[('root',)]['value']
     
@@ -448,41 +453,7 @@ class CFR(GameTree):
         value0 = self.get_best_response(0)
         value1 = self.get_best_response(1)
 
-        return 0.5*np.mean(value0 + value1)
-
-
-    """
-    def compute_br(traverser, opponent_strategy, initial_beliefs, values):
-        self.precompute_reaches(opponent_strategy, initial_beliefs)
-        self.precompute_all_leaf_values(traverser)
-
-        for public_node_id in range(len(tree)):
-            node = self.tree[public_node_id]
-            value = self.traverser_values[public_node_id]
-            
-            if node.num_children():
-                state = node.state
-                value = [0]*len(value)
-                if state.player_id == traverser:
-                    best_action = [0 for i in range(self.game.num_hands())]
-                    for child_node, action in ChildrenActionIt(node, game):
-                        new_value = self.traverser_values[child_node]
-                        for hand in range(self.game.num_hands()):
-                            if child_node == node.children_begin or new_value[hand] > value[hand]:
-                                value[hand] = new_value[hand]
-                                best_action[hand] = action
-                    for hand in range(self.game.num_hands()):
-                        self.br_strategies[public_node_id][hand] = [0 for i in range(self.game.num_actions())]
-                        self.br_strategies[public_node_id][hand][best_action[hand]] = 1
-                else:
-                    for child_node in ChildrenIt(node):
-                        new_value = traverser_values[child_node]
-                        for hand in range(self.game.num_hands()):
-                            value[hand] += new_value[hand]
-        
-        values = self.traverser_values[0] #TODO: Value points to somewhere. Find out where
-        return self.br_strategies
-        """
+        return 0.5*(np.mean(value0 + value1))
 
     
 
@@ -632,5 +603,5 @@ def train(game, value_net, epochs, games_per_epoch, T=1000):
 game = LiarsDice(num_dice=2, num_faces=3)
 
 v_net = build_value_net(game)
-end_solver = train(game, v_net, 20, 32, 1000)
+end_solver = train(game, v_net, 20, 32, 100)
 print(end_solver.compute_exploitability())
