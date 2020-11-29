@@ -12,11 +12,19 @@ class CoinGame(game_wrapper):
         self.num_hands = 2
         self.num_actions = 2
 
+    """
     def get_legal_moves(self, pbs):
         if pbs.public in [-1, 0]:
             return([0, 1])
         else:
             return([])
+    """
+
+    def get_legal_moves(self, node_name):
+        if node_name == ('root', ) or node_name == ('root', 1):
+            return [0, 1]
+        else:
+            return []
     
     def get_bid_ranges(self, node_name):
         if node_name == ('root', ) or node_name == ('root', 1):
@@ -89,13 +97,16 @@ class CoinGame(game_wrapper):
         """
         Converts a node to a tuple (last_action, current_player)
         """
-        return (node_name[-1], int(len(node_name) > 1))
+        return (node_name[-1], (len(node_name) - 1) % 2)
     
+    """
     def is_terminal(self, pbs):
-        """
         Returns whether or not a node is a terminal node in the game
-        """
         return(pbs.public in [1,2,3])
+    """
+
+    def is_terminal(self, node_name):
+        return node_name in [('root', 0), ('root', 1, 0), ('root', 1, 1)]
     
     def sample_history(self, solver, beliefs, random_action_prob):
         """

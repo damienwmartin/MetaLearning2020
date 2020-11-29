@@ -126,15 +126,17 @@ class GameTree:
 
         strategy = strat+'_strategy'
 
+        self.tree.nodes[('root', )]['reach_prob_buffer'] = self.initial_beliefs[traverser]
+
         for node_name in self.enumerate_subgame():
-            if node_name != self.cur_root_node:
+            if node_name != ('root', ):
                 state = self.game.node_to_state(node_name)
                 prev_player = self.game.node_to_state(node_name[:-1])[1]
-
-                self.tree.nodes[node_name]['reach_prob_buffer'] = self.tree.nodes[node_name[:-1]]['reach_prob_buffer']
                 if prev_player == traverser:
-                    self.tree.nodes[node_name]['reach_prob_buffer'] *= self.tree.nodes[node_name[:-1]][strategy][:, state[0]]
-    
+                    self.tree.nodes[node_name]['reach_prob_buffer'] = self.tree.nodes[node_name[:-1]]['reach_prob_buffer'] * self.tree.nodes[node_name[:-1]][strategy][:, state[0]]
+                else:
+                    self.tree.nodes[node_name]['reach_prob_buffer'] = self.tree.nodes[node_name[:-1]]['reach_prob_buffer']
+
     def query_value_net(self, traverser):
         self.net_query_buffer = []
         if self.pseudo_leaf_nodes != []:
@@ -173,7 +175,7 @@ class GameTree:
                 # Beliefs of H vs T for the person selling
 
                 for node_name in self.terminal_nodes:
-                    beliefs = self.tree.nodes[node_name]['reach_prob'][0] / np.sum(self.tree.nodes[node_name]['reach_prob'[0]], axis=0, keepdims=True)
+                    beliefs = (self.tree.nodes[node_name]['reach_prob'][0] + EPSILON) / np.sum(self.tree.nodes[node_name]['reach_prob'][0] + EPSILON, axis=0, keepdims=True)
                     if node_name == ('root', 0):
                         expected_val = np.sum(beliefs*np.array([-0.5, 0.5]))
                     elif node_name == ('root', 1, 0):
@@ -181,12 +183,12 @@ class GameTree:
                     elif node_name == ('root', 1, 1):
                         expected_val = np.sum(beliefs*np.array([-1, 1]))
                     
-                    node['value'] = np.array([expected_val, expected_val])
+                    self.tree.nodes[node_name]['value'] = np.array([expected_val, expected_val])
 
             else:
                 self.tree.nodes[('root', 0)]['value'] = np.array([0.5, -0.5])
-                self.traverser_values[('root', 1, 0)]['value'] = np.array([-1, 1])
-                self.traverser_values[('root', 1, 1)]['value'] = np.array([1, -1])
+                self.tree.nodes[('root', 1, 0)]['value'] = np.array([-1, 1])
+                self.tree.nodes[('root', 1, 1)]['value'] = np.array([1, -1])
 
         elif isinstance(self.game, LiarsDice):
             for node_name in self.terminal_nodes:
@@ -238,11 +240,11 @@ class CFR(GameTree):
     Note: will change all instances of self.game.get_bid_ranges() to self.game.get_legal_moves() soon
     """
 
-    def __init__(self, game, value_net, beliefs, params):
+    def __init__(self, game, value_net, initial_beliefs, params):
         
-        super().__init__(game, value_net, beliefs)
+        super().__init__(game, value_net, initial_beliefs)
         self.params = params
-        self.initial_beliefs = beliefs
+        self.initial_beliefs = initial_beliefs
         self.num_steps = [0, 0]
 
         self.root_values = [[], []]
@@ -260,21 +262,26 @@ class CFR(GameTree):
             node = self.tree.nodes[node_name]
             if not node['terminal'] and not node['subgame_terminal']:
                 state = self.game.node_to_state(node_name)
+                print(node_name, state)
                 value = np.zeros(self.game.num_hands)
                 if state[1] == traverser:
                     for action in self.game.get_legal_moves(node_name):
                         child_node = self.tree.nodes[node_name + (action, )]
                         node['regrets'][:, action] += child_node['value']
                         value += child_node['value'] * node['cur_strategy'][:, action]
+
                     
                     for action in self.game.get_legal_moves(node_name):
                         node['regrets'][:, action] -= value
+
+                    print("Regrets ", node['regrets'], " for node ", node_name)
+                    print("Value ", node['value'], " for node ", node_name)
             
                 else:
                     for action in self.game.get_legal_moves(node_name):
                         child_node = self.tree.nodes[node_name + (action, )]
-                        value += child_node['value'] * node['cur_strategy'][:, action]
-            
+                        value += (child_node['value'] * node['cur_strategy'][:, action])
+
                 node['value'] = value
     
     def step(self, traverser):
@@ -515,12 +522,15 @@ def rebel(game, value_net, T=1000):
         cur_node_id = next_node
         cur_node = solver.tree.nodes[cur_node_id]
     
-    return D_v
+    if isinstance(game, CoinGame):
+        print("Player 1 strategy:", solver.tree.nodes[('root', )]['avg_strategy'])
+        print("Player 2 strategy:", solver.tree.nodes[('root', 1)]['avg_strategy'])
 
 
 
 # Testing
 
-game = LiarsDice(num_dice=2, num_faces=3)
+# game = LiarsDice(num_dice=2, num_faces=3)
+game = CoinGame()
 v_net = build_value_net(game)
-rebel(game, v_net)
+rebel(game, v_net, 10)
