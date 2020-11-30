@@ -562,6 +562,8 @@ def rebel(game, value_net, T=1000, solver=None):
     return D_v, solver
 
 
+        
+
 from tqdm import tqdm
 def train(game, value_net, epochs, games_per_epoch, T=1000):
 

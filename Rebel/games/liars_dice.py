@@ -139,3 +139,6 @@ class LiarsDice(game_wrapper):
         player_turn = 0
         infostate_probs = np.ones((2, self.num_faces**self.num_dice)) / (self.num_faces**self.num_dice)
         return(PBS(public_state, infostate_probs))
+    
+    def sample_hands():
+        h1 = np.random.choice(self.num_faces, self.num_dice)
