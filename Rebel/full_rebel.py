@@ -119,7 +119,7 @@ class GameTree:
             cur_node = nodes_to_add[0]
             subgame.append(cur_node)
             
-            if len(cur_node) < len(self.cur_root_node) + self.cur_subgame_depth:
+            if not self.tree.nodes[cur_node]['terminal'] and not self.tree.nodes[cur_node]['subgame_terminal']:
                 nodes_to_add.extend([cur_node + (action, ) for action in self.game.get_legal_moves(cur_node)])
             
             nodes_to_add = nodes_to_add[1:]
@@ -453,7 +453,7 @@ class CFR(GameTree):
         value0 = self.get_best_response(0)
         value1 = self.get_best_response(1)
 
-        return value0, value1
+        return 0.5*(np.mean(value0 + value1))
 
     
 
@@ -590,8 +590,16 @@ def train(game, value_net, epochs, games_per_epoch, T=1000):
         loss.backward()
         value_optimizer.step()
         
-        if i % 2 == 0:
-            print(f'Epoch {i}: Loss {loss}')
+        if i % 5 == 4:
+            print(f'Epoch {i+1}: Loss {loss}')
+            PATH = f'Rebel/models/liars_dice_{game.num_dice}_{game.num_faces}_{i+1}.t7'
+            state = {
+                'epoch': i,
+                'state_dict': value_net.state_dict(),
+                'optimizer': value_optimizer.state_dict(),
+                'game_tree': solver.tree.nodes
+            }
+            torch.save(state, PATH)
     
     return solver
 
@@ -600,8 +608,8 @@ def train(game, value_net, epochs, games_per_epoch, T=1000):
 
 # Testing
 if __name__ == "__main__":
-    game = LiarsDice(num_dice=2, num_faces=3)
+    game = LiarsDice(num_dice=2, num_faces=2)
 
     v_net = build_value_net(game)
-    end_solver = train(game, v_net, 10, 4, 50)
+    end_solver = train(game, v_net, 30, 32, 250)
     print(end_solver.compute_exploitability())
