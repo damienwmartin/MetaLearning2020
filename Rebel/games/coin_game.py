@@ -53,17 +53,25 @@ class CoinGame(game_wrapper):
     #
     #    return (payoff, -1*payoff)
     
-    def get_rewards(self, pbs):
+    def get_rewards(self, pbs = None, node_id = None):
         '''
         First number for outcome if heads second number for tails
         rewards given with respect to player 1
         '''
-        if pbs.public == 1:
-            return(np.array([.5,-.5]))
-        if pbs.public == 2:
-            return(np.array([-1,1]))
-        if pbs.public == 3:
-            return(np.array([1,-1]))
+        if pbs != None:
+            if (pbs.public == 1) or (node_id == ('root', 0)):
+                return(np.array([.5,-.5]))
+            if pbs.public == 2 or (node_id == ('root', 1, 1)):
+                return(np.array([-1,1]))
+            if pbs.public == 3 or (node_id == ('root', 1, 0)):
+                return(np.array([1,-1]))
+        if node_id != None:
+            if (node_id == ('root', 0)):
+                return(np.array([.5,-.5]))
+            if (node_id == ('root', 1, 1)):
+                return(np.array([-1,1]))
+            if (node_id == ('root', 1, 0)):
+                return(np.array([1,-1]))
 
 
 
@@ -112,5 +120,10 @@ class CoinGame(game_wrapper):
     
     def get_initial_beliefs(self):
         return np.array([[0.5, 0.5], [0.5, 0.5]])
+
+    def sample_hands(self):
+        return((np.random.choice(2), 0))
+
+
 
         
