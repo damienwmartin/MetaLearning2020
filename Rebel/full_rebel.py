@@ -544,7 +544,7 @@ def rebel(game, value_net, T=1000, solver=None):
 
     while not cur_node['terminal']:
 
-        solver.build_depth_limited_subgame(cur_node_id, depth_limit=5)
+        solver.build_depth_limited_subgame(cur_node_id, depth_limit=3)
         t_sample = np.random.randint(T)
 
         for t in range(T):
@@ -567,7 +567,7 @@ def rebel(game, value_net, T=1000, solver=None):
 from tqdm import tqdm
 def train(game, value_net, epochs, games_per_epoch, T=1000):
 
-
+    device = 'cpu'
     solver = None
     value_optimizer = optim.Adam(value_net.parameters())
     loss_fn = nn.MSELoss()
@@ -579,12 +579,12 @@ def train(game, value_net, epochs, games_per_epoch, T=1000):
         train_y = []
         for j in tqdm(range(games_per_epoch)):
 			#Play a full game with rebel
-            D_v, solver = rebel(game, value_net, T, solver)
+            D_v, solver = rebel(game, value_net, T)
             train_x.extend([x[0] for x in D_v])
             train_y.extend([y[1] for y in D_v])
         
-        train_x = torch.stack(train_x, 0).float()
-        train_y = torch.stack(train_y, 0).float()
+        train_x = torch.stack(train_x, 0).float().to(device)
+        train_y = torch.stack(train_y, 0).float().to(device)
         
         value_optimizer.zero_grad()
         output = value_net.forward(train_x)
@@ -602,6 +602,7 @@ def train(game, value_net, epochs, games_per_epoch, T=1000):
                 'game_tree': solver.tree.nodes
             }
             torch.save(state, PATH)
+            print(solver.compute_exploitability())
     
     return solver
 
@@ -610,8 +611,8 @@ def train(game, value_net, epochs, games_per_epoch, T=1000):
 
 # Testing
 if __name__ == "__main__":
-    game = LiarsDice(num_dice=2, num_faces=2)
+    game = LiarsDice(num_dice=3, num_faces=3)
 
     v_net = build_value_net(game)
-    end_solver = train(game, v_net, 30, 32, 250)
+    end_solver = train(game, v_net, 50, 16, 50)
     print(end_solver.compute_exploitability())
