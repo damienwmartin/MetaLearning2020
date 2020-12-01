@@ -604,6 +604,7 @@ def train(game, value_net, epochs, games_per_epoch, T=1000):
                 'game_tree': solver.tree.nodes
             }
             torch.save(state, PATH)
+            print(solver.compute_exploitability())
     
     return solver
 
@@ -612,8 +613,8 @@ def train(game, value_net, epochs, games_per_epoch, T=1000):
 
 # Testing
 if __name__ == "__main__":
-    game = LiarsDice(num_dice=2, num_faces=2)
+    game = LiarsDice(num_dice=1, num_faces=1)
 
     v_net = build_value_net(game)
-    end_solver = train(game, v_net, 30, 32, 250)
+    end_solver = train(game, v_net, 50, 16, 100)
     print(end_solver.compute_exploitability())
