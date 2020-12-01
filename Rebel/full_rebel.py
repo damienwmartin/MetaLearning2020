@@ -544,7 +544,7 @@ def rebel(game, value_net, T=1000, solver=None):
 
     while not cur_node['terminal']:
 
-        solver.build_depth_limited_subgame(cur_node_id, depth_limit=5)
+        solver.build_depth_limited_subgame(cur_node_id, depth_limit=3)
         t_sample = np.random.randint(T)
 
         for t in range(T):
@@ -579,7 +579,9 @@ def train(game, value_net, epochs, games_per_epoch, T=1000):
         train_y = []
         for j in tqdm(range(games_per_epoch)):
 			#Play a full game with rebel
-            D_v, solver = rebel(game, value_net, T, solver)
+
+            D_v, solver = rebel(game, value_net, T)
+            print(len(solver.tree.nodes))
             train_x.extend([x[0] for x in D_v])
             train_y.extend([y[1] for y in D_v])
         
@@ -592,9 +594,9 @@ def train(game, value_net, epochs, games_per_epoch, T=1000):
         loss.backward()
         value_optimizer.step()
         
-        if i % 5 == 4:
+        if i %  4 == 1:
             print(f'Epoch {i+1}: Loss {loss}')
-            PATH = f'Rebel/models/liars_dice_{game.num_dice}_{game.num_faces}_{i+1}.t7'
+            PATH = f'models/liars_dice_{game.num_dice}_{game.num_faces}_{i+1}.t7'
             state = {
                 'epoch': i,
                 'state_dict': value_net.state_dict(),
