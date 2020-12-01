@@ -414,48 +414,6 @@ class CFR(GameTree):
     def get_tree(self):
         return self.tree
     
-    def get_best_response(self, traverser):
-        self.precompute_all_reaches(strat='avg')
-        self.precompute_all_leaf_values(traverser)
-
-        for node_name in reversed(list(self.tree.nodes)):
-            node = self.tree.nodes[node_name]
-
-            if not node['terminal'] and not node['subgame_terminal']:
-                state = self.game.node_to_state(node_name)
-                if state[1] == traverser:
-                    node['best_response'] = np.zeros((self.game.num_hands, self.game.num_actions))
-                    value = np.full((self.game.num_hands,), np.NINF)
-                    best_action = [0 for i in range(self.game.num_hands)]
-                    for action in self.game.get_legal_moves(node_name):
-                        new_value = self.tree.nodes[node_name + (action, )]['value']
-                        for hand in range(self.game.num_hands):
-                            if new_value[hand] > value[hand]:
-                                value[hand] = new_value[hand]
-                                best_action[hand] = action
-                    
-                    node['value'] = np.array(value)
-                    for hand in range(self.game.num_hands):
-                        node['best_response'][hand][best_action[hand]] = 1
-                
-                else:
-                    value = np.zeros((self.game.num_hands,))
-                    beliefs = (node['reach_prob'][1 - traverser] + EPSILON) / np.sum(node['reach_prob'][1 - traverser] + EPSILON, axis=0, keepdims=True)
-                    for action in self.game.get_legal_moves(node_name):
-                        child_node = self.tree.nodes[node_name + (action, )]
-                        value += np.sum(beliefs*node['avg_strategy'][:, action], axis=0)*np.array(child_node['value'])
-                    
-                    node['value'] = value
-        
-        return self.tree.nodes[('root',)]['value']
-    
-    def compute_exploitability(self):
-        value0 = self.get_best_response(0)
-        value1 = self.get_best_response(1)
-
-        return 0.5*(np.mean(value0 + value1))
-
-    
 
 def compute_expected_terminal_values(game, last_bid, inverse, op_reach_probabilities):
     """
@@ -569,6 +527,7 @@ def train(game, value_net, epochs, games_per_epoch, T=1000):
 
 
     solver = None
+    policy = Policy(game)
     value_optimizer = optim.Adam(value_net.parameters())
     loss_fn = nn.MSELoss()
     value_net.train()
@@ -581,7 +540,7 @@ def train(game, value_net, epochs, games_per_epoch, T=1000):
 			#Play a full game with rebel
 
             D_v, solver = rebel(game, value_net, T)
-            print(len(solver.tree.nodes))
+            policy.update(solver)
             train_x.extend([x[0] for x in D_v])
             train_y.extend([y[1] for y in D_v])
         
@@ -594,27 +553,157 @@ def train(game, value_net, epochs, games_per_epoch, T=1000):
         loss.backward()
         value_optimizer.step()
         
-        if i %  4 == 1:
+        if i % 10 == 9:
             print(f'Epoch {i+1}: Loss {loss}')
             PATH = f'models/liars_dice_{game.num_dice}_{game.num_faces}_{i+1}.t7'
             state = {
                 'epoch': i,
                 'state_dict': value_net.state_dict(),
                 'optimizer': value_optimizer.state_dict(),
-                'game_tree': solver.tree.nodes
+                'game_tree': solver.tree.nodes,
+                'policy': policy
             }
             torch.save(state, PATH)
-            print(solver.compute_exploitability())
+            print(policy.compute_exploitability())
     
-    return solver
+    return policy
 
 
+
+class Policy:
+
+    def __init__(self, game):
+        self.game = game
+        self.tree = nx.DiGraph()
+        self.terminal_nodes = []
+
+        # Initializes the whole game tree with a uniform strategy
+        nodes_to_add = [('root', )]
+        while nodes_to_add != []:
+            cur_node = nodes_to_add[0]
+            legal_moves = game.get_legal_moves(cur_node)
+            N = len(legal_moves)
+            for action in legal_moves:
+                nodes_to_add.append(cur_node + (action, ))
+            
+            self.tree.add_node(cur_node,
+                                policy=np.array([[1/N if i in legal_moves else 0 for i in range(game.num_actions)] for j in range(game.num_hands)]),
+                                value=np.zeros(game.num_hands),
+                                best_response=np.zeros((game.num_hands, game.num_actions)),
+                                terminal=game.is_terminal(cur_node),
+                                reach_prob=np.zeros((2, game.num_hands)))
+            
+            if game.is_terminal(cur_node):
+                self.terminal_nodes.append(cur_node)
+            
+            nodes_to_add = nodes_to_add[1:]
+        
+        self.tree.nodes[('root', )]['reach_prob'] = game.get_initial_beliefs()
+    
+    def update(self, solver):
+        """
+        Replaces the current policy found with a new policy
+        """
+
+        for node_name in solver.tree.nodes:
+            if node_name in self.tree:
+                self.tree.nodes[node_name]['policy'] = solver.tree.nodes[node_name]['avg_strategy']
+            else:
+                raise Exception("Node not found in game tree: ", node_name)
+    
+    def precompute_all_reaches(self):
+        """
+        Computes the reach probabilities within a particular subgame
+        """
+
+        for cur_node in self.tree.nodes:
+            if cur_node != ('root', ):
+                state = self.game.node_to_state(cur_node)
+                prev_player = self.game.node_to_state(cur_node[:-1])[1]
+                self.tree.nodes[cur_node]['reach_prob'] = 1 * self.tree.nodes[cur_node[:-1]]['reach_prob']
+                if prev_player:
+                    self.tree.nodes[cur_node]['reach_prob'][1] *= self.tree.nodes[cur_node[:-1]]['policy'][:, state[0]]
+                else:
+                    self.tree.nodes[cur_node]['reach_prob'][0] *= self.tree.nodes[cur_node[:-1]]['policy'][:, state[0]]
+    
+    def precompute_all_leaf_values(self, traverser):
+        """
+        Computes the expected value of each terminal node, according to the traverser
+        """
+
+        if isinstance(self.game, CoinGame):
+            if traverser:
+                # Beliefs of H vs T for the person selling
+
+                for node_name in self.terminal_nodes:
+                    beliefs = (self.tree.nodes[node_name]['reach_prob'][0] + EPSILON) / np.sum(self.tree.nodes[node_name]['reach_prob'][0] + EPSILON, axis=0, keepdims=True)
+                    if node_name == ('root', 0):
+                        expected_val = np.sum(beliefs*np.array([-0.5, 0.5]))
+                    elif node_name == ('root', 1, 0):
+                        expected_val = np.sum(beliefs*np.array([1, -1]))
+                    elif node_name == ('root', 1, 1):
+                        expected_val = np.sum(beliefs*np.array([-1, 1]))
+                    
+                    self.tree.nodes[node_name]['value'] = np.array([expected_val, expected_val])
+
+            else:
+                self.tree.nodes[('root', 0)]['value'] = np.array([0.5, -0.5])
+                self.tree.nodes[('root', 1, 0)]['value'] = np.array([-1, 1])
+                self.tree.nodes[('root', 1, 1)]['value'] = np.array([1, -1])
+
+        elif isinstance(self.game, LiarsDice):
+            for node_name in self.terminal_nodes:
+                last_bid = self.game.node_to_state(node_name[:-1])[0]
+                node = self.tree.nodes[node_name]
+                node['value'] = compute_expected_terminal_values(self.game, last_bid, self.game.node_to_state(node_name)[1] != traverser, node['reach_prob'][1 - traverser])
+
+
+    def get_best_response(self, traverser):
+        self.precompute_all_reaches()
+        self.precompute_all_leaf_values(traverser)
+
+        for node_name in reversed(list(self.tree.nodes)):
+            node = self.tree.nodes[node_name]
+
+            if not node['terminal']:
+                state = self.game.node_to_state(node_name)
+                if state[1] == traverser:
+                    node['best_response'] = np.zeros((self.game.num_hands, self.game.num_actions))
+                    value = np.full((self.game.num_hands,), np.NINF)
+                    best_action = [0 for i in range(self.game.num_hands)]
+                    for action in self.game.get_legal_moves(node_name):
+                        new_value = self.tree.nodes[node_name + (action, )]['value']
+                        for hand in range(self.game.num_hands):
+                            if new_value[hand] > value[hand]:
+                                value[hand] = new_value[hand]
+                                best_action[hand] = action
+                    
+                    node['value'] = np.array(value)
+                    for hand in range(self.game.num_hands):
+                        node['best_response'][hand][best_action[hand]] = 1
+                
+                else:
+                    value = np.zeros((self.game.num_hands,))
+                    beliefs = (node['reach_prob'][1 - traverser] + EPSILON) / np.sum(node['reach_prob'][1 - traverser] + EPSILON, axis=0, keepdims=True)
+                    for action in self.game.get_legal_moves(node_name):
+                        child_node = self.tree.nodes[node_name + (action, )]
+                        value += np.sum(beliefs*node['policy'][:, action], axis=0)*np.array(child_node['value'])
+                    
+                    node['value'] = value
+        
+        return self.tree.nodes[('root',)]['value']
+    
+    def compute_exploitability(self):
+        value0 = self.get_best_response(0)
+        value1 = self.get_best_response(1)
+
+        return 0.5*(np.mean(value0 + value1))
 
 
 # Testing
 if __name__ == "__main__":
-    game = LiarsDice(num_dice=1, num_faces=1)
+    game = LiarsDice(num_dice=3, num_faces=3)
 
     v_net = build_value_net(game)
-    end_solver = train(game, v_net, 50, 16, 100)
-    print(end_solver.compute_exploitability())
+    end_policy = train(game, v_net, 50, 16, 250)
+    print(end_policy.compute_exploitability())
