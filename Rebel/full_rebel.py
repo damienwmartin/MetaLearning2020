@@ -579,7 +579,13 @@ def train(game, value_net, epochs, games_per_epoch, T=1000):
         train_y = []
         for j in tqdm(range(games_per_epoch)):
 			#Play a full game with rebel
+<<<<<<< HEAD
             D_v, solver = rebel(game, value_net, T)
+=======
+
+            D_v, solver = rebel(game, value_net, T)
+            print(len(solver.tree.nodes))
+>>>>>>> 1f8a1b7034875d4de2b7016a39eb06b3a53991c4
             train_x.extend([x[0] for x in D_v])
             train_y.extend([y[1] for y in D_v])
         
@@ -592,9 +598,9 @@ def train(game, value_net, epochs, games_per_epoch, T=1000):
         loss.backward()
         value_optimizer.step()
         
-        if i % 5 == 4:
+        if i %  4 == 1:
             print(f'Epoch {i+1}: Loss {loss}')
-            PATH = f'Rebel/models/liars_dice_{game.num_dice}_{game.num_faces}_{i+1}.t7'
+            PATH = f'models/liars_dice_{game.num_dice}_{game.num_faces}_{i+1}.t7'
             state = {
                 'epoch': i,
                 'state_dict': value_net.state_dict(),
@@ -611,8 +617,16 @@ def train(game, value_net, epochs, games_per_epoch, T=1000):
 
 # Testing
 if __name__ == "__main__":
+<<<<<<< HEAD
     game = LiarsDice(num_dice=3, num_faces=3)
 
     v_net = build_value_net(game)
     end_solver = train(game, v_net, 50, 16, 50)
     print(end_solver.compute_exploitability())
+=======
+    game = LiarsDice(num_dice=1, num_faces=1)
+
+    v_net = build_value_net(game)
+    end_solver = train(game, v_net, 50, 16, 100)
+    print(end_solver.compute_exploitability())
+>>>>>>> 1f8a1b7034875d4de2b7016a39eb06b3a53991c4
