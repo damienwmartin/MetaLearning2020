@@ -37,7 +37,7 @@ class LiarsDice(game_wrapper):
         self.num_dice = num_dice
         self.num_faces = num_faces
         self.total_num_dice = 2 * num_dice
-        self.num_actions = 1 + num_dice*num_faces
+        self.num_actions = 1 + self.total_num_dice*num_faces
         self.num_hands = num_faces**num_dice
         self.liar_call = self.num_actions - 1 # Action ID for calling BS
         self.wild_face = num_faces -  1 # Face ID for the face considered "wild"
