@@ -421,7 +421,7 @@ def compute_expected_terminal_values(game, last_bid, inverse, op_reach_probabili
 
     op_reach_probabilities -> input from precompute_terminal_leaf values was probability of reaching the node for each hand
     """
-    inv = 2*int(inverse) - 1
+    inv = 1 - 2*int(inverse)
     values = compute_win_probability(game, last_bid, op_reach_probabilities)
     belief_sum = sum(op_reach_probabilities)
 
