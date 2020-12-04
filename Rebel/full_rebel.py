@@ -725,4 +725,4 @@ if __name__ == "__main__":
     end_solver.update(CFR_solver)
 
     print('Outputting results...')
-    print(end_solver.compute_exploitability())
+    print('Exploitability:', end_solver.compute_exploitability())
