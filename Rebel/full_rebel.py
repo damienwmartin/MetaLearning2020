@@ -721,9 +721,7 @@ if __name__ == "__main__":
 
     print('running CFR...')
     CFR_solver.build_depth_limited_subgame()
-    print('got here')
     CFR_solver.step(0)
-    print('got here too')
     end_solver.update(CFR_solver)
 
     print('Outputting results...')
