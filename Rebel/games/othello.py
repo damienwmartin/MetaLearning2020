@@ -65,8 +65,12 @@ class OthelloBoard():
         # Set up the initial 4 pieces.
         self.pieces[int(self.n/2)-1][int(self.n/2)] = -1
         self.pieces[int(self.n/2)][int(self.n/2)-1] = -1
-        self.pieces[int(self.n/2)-1][int(self.n/2)-1] = 1;
-        self.pieces[int(self.n/2)][int(self.n/2)] = 1;
+        self.pieces[int(self.n/2)-1][int(self.n/2)-1] = 1
+        self.pieces[int(self.n/2)][int(self.n/2)] = 1
+
+    # add [][] indexer syntax to the Board
+    def __getitem__(self, index):
+        return self.pieces[index]
 
     def countDiff(self, color):
         """
@@ -77,15 +81,11 @@ class OthelloBoard():
         count = 0
         for y in range(self.n):
             for x in range(self.n):
-                if self[x][y]==color:
+                if self.pieces[x][y]==color:
                     count += 1
-                if self[x][y]==-color:
+                if self.pieces[x][y]==-color:
                     count -= 1
         return count
-
-    # add [][] indexer syntax to the Board
-    def __getitem__(self, index):
-        return self.pieces[index]
 
     def get_legal_moves(self, color):
         """Returns all the legal moves for the given color.
@@ -96,7 +96,7 @@ class OthelloBoard():
         # Get all the squares with pieces of the given color.
         for y in range(self.n):
             for x in range(self.n):
-                if self[x][y]==color:
+                if self.pieces[x][y]==color:
                     newmoves = self.get_moves_for_square((x,y))
                     moves.update(newmoves)
         return list(moves)
@@ -104,12 +104,17 @@ class OthelloBoard():
     def has_legal_moves(self, color):
         for y in range(self.n):
             for x in range(self.n):
-                if self[x][y]==color:
+                print('has_legal_moves x=', x)
+                print('has_legal_moves y=', y)
+                print('self', self)
+                print('pieces', self.pieces)
+                print('self.pieces[x]=', self.pieces[x])
+                if self.pieces[x][y]==color:
                     newmoves = self.get_moves_for_square((x,y))
                     if len(newmoves)>0:
                         return True
         return False
-    
+
     def get_moves_for_square(self, square):
         """Returns all the legal moves that use the given square as a base.
         That is, if the given square is (3,4) and it contains a black piece,
@@ -120,7 +125,7 @@ class OthelloBoard():
         (x,y) = square
 
         # determine the color of the piece.
-        color = self[x][y]
+        color = self.pieces[x][y]
 
         # skip empty source squares.
         if color==0:
@@ -151,26 +156,26 @@ class OthelloBoard():
                       for flip in self._get_flips(move, direction, color)]
         assert len(list(flips))>0
         for x, y in flips:
-            #print(self[x][y],color)
-            self[x][y] = color
+            #print(self.pieces[x][y],color)
+            self.pieces[x][y] = color
 
     def _discover_move(self, origin, direction):
         """ Returns the endpoint for a legal move, starting at the given origin,
         moving by the given increment."""
         x, y = origin
-        color = self[x][y]
+        color = self.pieces[x][y]
         flips = []
 
         for x, y in OthelloBoard._increment_move(origin, direction, self.n):
-            if self[x][y] == 0:
+            if self.pieces[x][y] == 0:
                 if flips:
                     # print("Found", x,y)
                     return (x, y)
                 else:
                     return None
-            elif self[x][y] == color:
+            elif self.pieces[x][y] == color:
                 return None
-            elif self[x][y] == -color:
+            elif self.pieces[x][y] == -color:
                 # print("Flip",x,y)
                 flips.append((x, y))
 
@@ -182,11 +187,11 @@ class OthelloBoard():
 
         for x, y in OthelloBoard._increment_move(origin, direction, self.n):
             #print(x,y)
-            if self[x][y] == 0:
+            if self.pieces[x][y] == 0:
                 return []
-            if self[x][y] == -color:
+            if self.pieces[x][y] == -color:
                 flips.append((x, y))
-            elif self[x][y] == color and len(flips) > 0:
+            elif self.pieces[x][y] == color and len(flips) > 0:
                 #print(flips)
                 return flips
 
@@ -260,7 +265,7 @@ class OthelloGame():
         # return 0 if not ended, 1 if player 1 won, -1 if player 1 lost
         # player = 1
         b = OthelloBoard(self.n)
-        b.pieces = np.copy(board)
+        b.pieces = np.copy(board.pieces)
         if b.has_legal_moves(player):
             return 0
         if b.has_legal_moves(-player):
@@ -342,7 +347,7 @@ class Othello():
 
         #required by rebel implementations
         self.num_actions = board_size*board_size+1
-        game.num_hands = 1 #perfect information, so only one infostate
+        self.num_hands = 1 #perfect information, so only one infostate
 
     def move_to_actionID(self, move):
         '''
@@ -366,7 +371,7 @@ class Othello():
         Gets the board corresponding to the histories of actions in node.
         '''
         player = 1
-        board = OthelloBoard(self.n)
+        board = OthelloBoard(self.board_size)
         if node == ('root'):
             return board
         #add pieces for each action after root
@@ -430,11 +435,11 @@ class Othello():
         Required by rebel implementation.
         Because othello is perfect information game, there's only one possible 'hand'
         '''
-        return np.array([1])
+        return np.array([1,1])
 
     def sample_hands(self):
         '''
-        Required xy rebel implementation.
+        Required by rebel implementation.
         Because othello is perfect information game, there's only one possible 'hand'
         '''
         return 0
@@ -450,10 +455,8 @@ class Othello():
 
 
 ### Testing functions
-'''
-+---+ - + - +
-| X | O |   |
-+-+-+-+
-|X|O| |
-+-+-+-+
-'''
+# test_board = OthelloBoard()
+# test_game = OthelloGame(n=4)
+# test_instance = Othello(4)
+# test_instance.is_terminal(('root'))
+# test_board[0][1]
