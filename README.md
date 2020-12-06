@@ -22,12 +22,13 @@ networkx
 unittest
 ```
 
-### Installation instructions
+### Installation Instructions
 To install:
 
 1. Clone this repository to your local machine and.
 ```
  $ git clone https://github.com/damienwmartin/MetaLearning2020.git
+ $ cd MetaLearning2020/
 ```
 
 2. Follow the instructions to install `pytorch` listed on their <a href='https://pytorch.org/get-started/locally/' target='blank'>website</a>.
@@ -49,9 +50,17 @@ The main implementation code is found in the `Rebel/` folder.
 
 The `experiments/` folder contains jupyter notebooks for replicating the experiments in our project report.
 
-The `tests\` folder contains test cases for confirming successful installation and that the implementation is working correctly.
+The `tests/` folder contains test cases for confirming successful installation and that the implementation is working correctly.
+
+The `games/` folder contains implementations of games.
 
 More details about the implementation can be found [here](https://github.com/damienwmartin/MetaLearning2020/tree/main/Rebel#python-rebel-implementation)
+
+## Running ReBeL and ReBeL 2.0
+
+TODO: Instructions for how to run their own code here.
+
+To use your own games, implement the functions in `games/game_wrapper.py`.
 
 ## References
 Original rebel paper can be found [here](https://arxiv.org/abs/2007.13544) and repository [here](https://github.com/facebookresearch/rebel)
