@@ -699,10 +699,6 @@ class Policy:
     def compute_exploitability(self):
         value0 = self.get_best_response(0)
         value1 = self.get_best_response(1)
-        print('value0', value0)
-        print('value1', value1)
-
-        print('Calcs are same', np.equal(0.5*np.mean(value0+value1), 0.5*(np.mean(value0)+np.mean(value1))))
         return 0.5*(np.mean(value0 + value1))
 
 

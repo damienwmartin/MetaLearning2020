@@ -1,4 +1,5 @@
 import numpy as np
+
 class RPS():
 	'''
 	RPS
@@ -16,7 +17,7 @@ class RPS():
 		self.num_hands = 3
 
 
-	
+
 	def get_legal_moves(self, PBS):
 		'''
 		0 -> Rock
@@ -37,7 +38,7 @@ class RPS():
 		reward = np.multiply(payout_matrix, PBS.infostate_matrix()).sum().sum()
 		return(reward)
 
-	
+
 	def sample_history(self, PBS):
 		#samples a history from the PBS
 		hand1 = np.random.choice([0,1,2], p=PBS.infostate_probs[1])
@@ -53,11 +54,11 @@ class RPS():
 
 	def is_terminal(self, PBS):
 		return(PBS.public[0]==0)
-	
+
 	"""
 	NOTE: The functions below are really sketch; not sure how to represent this
 	"""
-	
+
 	def iter_at_node(self, node_id):
 		if node_id == ('root', ):
 			for action in [0, 1, 2]:
@@ -68,12 +69,9 @@ class RPS():
 			return (-1, 0)
 		else:
 			return (node_id[-1], len(node))
-	
+
 	def node_to_number(self, node_id):
 		if node_id == ('root', ):
 			return 0
 		else:
 			return 1
-		
-
-		

@@ -1,4 +1,4 @@
-from Rebel_Alg import ReBeL
+#from full_rebel import ReBeL
 from games.coin_game import CoinGame
 from games.liars_dice import LiarsDice
 from CFR import CFR
@@ -19,7 +19,7 @@ def build_value_net(game):
         return Net2(n_in=input_size, n_out=game.num_hands, n_hidden=256, n_layers=3)
     else:
         raise Exception("Game's value_net is not supported yet.")
-    
+
 def build_mlp(
     *,
     n_in,
@@ -105,19 +105,18 @@ class GELU(nn.Module):
 
 
 
-game = LiarsDice(num_dice=2, num_faces=3)
-beliefs = np.array([np.ones(game.num_hands) / game.num_hands for i in range(2)])
-pbs = PBS(('root', ), beliefs)
-
-
-"""
-G = recursive_game_tree(PBS, game)
-G.build_full_coin_game()
-params = {'dcfr': False, 'linear_update': False, 'num_iters': 10000}
-agent = CFR(game, G, build_value_net(game), beliefs, params)
-
-agent.multistep()
-
-"""
-# ReBeL(pbs, game, build_value_net(game))
-
+# game = LiarsDice(num_dice=2, num_faces=3)
+# beliefs = np.array([np.ones(game.num_hands) / game.num_hands for i in range(2)])
+# pbs = PBS(('root', ), beliefs)
+#
+#
+# """
+# G = recursive_game_tree(PBS, game)
+# G.build_full_coin_game()
+# params = {'dcfr': False, 'linear_update': False, 'num_iters': 10000}
+# agent = CFR(game, G, build_value_net(game), beliefs, params)
+#
+# agent.multistep()
+#
+# """
+# # ReBeL(pbs, game, build_value_net(game))
