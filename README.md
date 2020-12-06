@@ -19,7 +19,6 @@ jupyterlab
 numpy
 matplotlib
 networkx
-unittest
 ```
 
 ### Installation Instructions
