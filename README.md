@@ -20,6 +20,7 @@ numpy
 matplotlib
 networkx
 scipy
+tqdm
 ```
 
 ### Installation Instructions
