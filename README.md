@@ -50,10 +50,7 @@ The main implementation code is found in the `Rebel/` folder.
 
 The `experiments/` folder contains jupyter notebooks for replicating the experiments in our project report.
 
-The `tests/` folder contains test cases for confirming successful installation and that the implementation is working correctly.
-
-The `games/` folder contains implementations of games.
-
+The `depreciated/` folder contains files that were used during the development process, and are no longer used. These files are currently staged for deletion.
 More details about the implementation can be found [here](https://github.com/damienwmartin/MetaLearning2020/tree/main/Rebel#python-rebel-implementation)
 
 ## Running ReBeL and ReBeL 2.0
