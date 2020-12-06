@@ -19,6 +19,7 @@ jupyterlab
 numpy
 matplotlib
 networkx
+scipy
 ```
 
 ### Installation Instructions
