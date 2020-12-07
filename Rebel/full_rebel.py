@@ -748,6 +748,7 @@ class Policy:
 # Testing
 if __name__ == "__main__":
     game = LiarsDice(num_dice=3, num_faces=3)
+    game = Othello()
     print('initializing value net...')
     v_net = build_value_net(game)
     print('Training...')
