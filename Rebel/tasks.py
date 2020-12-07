@@ -17,6 +17,9 @@ def build_value_net(game):
     elif isinstance(game, LiarsDice):
         input_size = 2 + game.num_actions + 2*game.num_hands
         return Net2(n_in=input_size, n_out=game.num_hands, n_hidden=256, n_layers=3)
+    elif isinstance(game, Othello):
+        input_size = 1+ game.board_size ** 2
+        return Net2(n_in = input_size, n_out=1, n_hidden=256, n_layers=3) 
     else:
         raise Exception("Game's value_net is not supported yet.")
 

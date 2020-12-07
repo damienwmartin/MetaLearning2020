@@ -746,5 +746,7 @@ if __name__ == "__main__":
     game = LiarsDice(num_dice=3, num_faces=3)
     print('initializing value net...')
     v_net = build_value_net(game)
-    end_policy = train(game, v_net, 50, 16, 250)
+    print('Training...')
+    end_policy = train(game, v_net, 1, 16, 250)
+    print('Computing exploitability...')
     print(end_policy.compute_exploitability())
