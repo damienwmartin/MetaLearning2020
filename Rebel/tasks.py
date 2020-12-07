@@ -1,6 +1,7 @@
 #from full_rebel import ReBeL
 from games.coin_game import CoinGame
 from games.liars_dice import LiarsDice
+from games.othello import Othello
 from CFR import CFR
 import numpy as np
 import torch
@@ -19,7 +20,7 @@ def build_value_net(game):
         return Net2(n_in=input_size, n_out=game.num_hands, n_hidden=256, n_layers=3)
     elif isinstance(game, Othello):
         input_size = 1+ game.board_size ** 2
-        return Net2(n_in = input_size, n_out=1, n_hidden=256, n_layers=3) 
+        return Net2(n_in = input_size, n_out=1, n_hidden=256, n_layers=3)
     else:
         raise Exception("Game's value_net is not supported yet.")
 
