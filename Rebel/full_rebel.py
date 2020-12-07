@@ -503,22 +503,21 @@ def write_query_to(game, traverser, state, reaches1, reaches2):
     Creates the query tensor to be added to the value net
     """
 
-    if isinstance(game, Othello):
-        buffer = [state[1], traverser]
-        for action in range(game.num_actions):
-            buffer.append(int(action==state[0]))
-        buffer.extend(normalize_probabilities_safe(reaches1, EPSILON))
-        buffer.extend(normalize_probabilities_safe(reaches2, EPSILON))
+    buffer = [state[1], traverser]
+    for action in range(game.num_actions):
+        buffer.append(int(action==state[0]))
+    buffer.extend(normalize_probabilities_safe(reaches1, EPSILON))
+    buffer.extend(normalize_probabilities_safe(reaches2, EPSILON))
 
-    if isinstance(game, LiarsDice):
-        buffer = [state[1], traverser]
-        for action in range(game.num_actions):
-            buffer.append(int(action == state[0]))
+    # if isinstance(game, LiarsDice):
+    #     buffer = [state[1], traverser]
+    #     for action in range(game.num_actions):
+    #         buffer.append(int(action == state[0]))
+    #
+    #     buffer.extend(normalize_probabilities_safe(reaches1, EPSILON))
+    #     buffer.extend(normalize_probabilities_safe(reaches2, EPSILON))
 
-        buffer.extend(normalize_probabilities_safe(reaches1, EPSILON))
-        buffer.extend(normalize_probabilities_safe(reaches2, EPSILON))
-
-        write_index = len(buffer)
+    write_index = len(buffer)
 
     return write_index, buffer
 
