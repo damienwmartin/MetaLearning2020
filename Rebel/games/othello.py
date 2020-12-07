@@ -131,7 +131,6 @@ class OthelloBoard():
         moves = []
         for direction in self.__directions:
             move = self._discover_move(square, direction)
-            print('MOVE ',move)
             if move:
                 # print(square,move,direction)
                 moves.append(move)
