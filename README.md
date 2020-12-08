@@ -57,7 +57,7 @@ More details about the implementation can be found [here](https://github.com/dam
 
 ## Running ReBeL and ReBeL 2.0
 
-TODO: Instructions for how to run their own code here.
+The `rebel()` function defaults to vanilla RebeL unless you specify a `node_lmit`. For examples of usage, see `Rebel/full_rebel.py`and `experiments/tournaments.ipynb`.
 
 To use your own games, implement the functions in `games/game_wrapper.py`.
 
